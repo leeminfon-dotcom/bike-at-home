@@ -3,189 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon Trainer V19 (Full UUID)</title>
+    <title>Horizon Trainer V20 (Smart Filter)</title>
     <style>
-        :root { --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6; --text: #f8fafc; }
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        
-        button {
-            background: var(--primary); color: white; border: none; padding: 25px; 
-            font-size: 22px; border-radius: 12px; width: 100%; max-width: 400px;
-            margin-bottom: 20px; font-weight: bold; cursor: pointer;
+        :root {
+            --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6;
+            --text: #f8fafc; --text-muted: #94a3b8;
+            --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899;
         }
-        button:active { opacity: 0.8; }
-
-        /* 日誌區 */
-        #console-log {
-            width: 100%; max-width: 400px; height: 200px;
-            background: #332b00; border: 2px solid #facc15; color: #facc15;
-            padding: 10px; font-family: monospace; font-size: 12px;
-            overflow-y: scroll; border-radius: 8px; box-sizing: border-box;
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg); color: var(--text);
+            margin: 0; padding: 15px;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; touch-action: manipulation;
         }
 
-        /* 儀表板簡化版 */
-        .dash { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 400px; margin-bottom: 20px; }
-        .box { background: var(--surface); padding: 15px; border-radius: 10px; text-align: center; }
-        .val { font-size: 32px; font-weight: bold; }
-        .lbl { font-size: 12px; color: #aaa; }
+        .header { width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .bt-icon { width: 24px; height: 24px; fill: #64748b; transition: 0.3s; }
+        .bt-icon.connected { fill: var(--primary); filter: drop-shadow(0 0 5px var(--primary)); }
+
+        .dashboard {
+            display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;
+            width: 100%; max-width: 500px; margin-bottom: 20px;
+        }
+        .mini-card { background: var(--surface); padding: 10px 5px; border-radius: 12px; text-align: center; }
+        .mini-val { font-size: 24px; font-weight: 800; line-height: 1; }
+        .mini-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
+        .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
+
+        .global-timer-box {
+            width: 100%; max-width: 500px; background: #000; border-radius: 16px;
+            padding: 15px; margin-bottom: 20px; text-align: center; border: 1px solid #333;
+            box-sizing: border-box;
+        }
+        .total-time-display { font-size: 48px; font-weight: bold; font-family: monospace; color: white; letter-spacing: 2px; }
+        .total-label { color: #666; font-size: 12px; margin-top: 5px; }
+
+        .phase-container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+        .phase-card {
+            background: var(--surface); border: 2px solid #334155;
+            border-radius: 16px; padding: 15px; transition: 0.3s;
+            display: flex; flex-direction: column; gap: 10px;
+            position: relative; overflow: hidden;
+        }
+        .phase-card.active { border-color: var(--primary); background: #17253d; box-shadow: 0 0 20px rgba(59,130,246,0.15); }
+        .phase-title { font-weight: bold; color: var(--text-muted); font-size: 14px; letter-spacing: 1px; display: flex; justify-content: space-between; }
+        .phase-card.active .phase-title { color: var(--primary); }
+
+        .controls-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .control-group { 
+            display: flex; align-items: center; gap: 5px; 
+            background: rgba(0,0,0,0.2); 
+            padding: 8px 12px; border-radius: 12px; 
+            flex: 1; justify-content: center;
+        }
+        .ctrl-column { display: flex; flex-direction: column; align-items: center; }
+        .ctrl-btn {
+            width: 44px; height: 44px; border-radius: 50%; border: none;
+            background: #334155; color: white; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: 0.1s;
+        }
+        .ctrl-btn:active { background: var(--primary); transform: scale(0.95); }
+        .ctrl-val { 
+            font-size: 48px; font-weight: 800; width: 70px; text-align: center; 
+            font-variant-numeric: tabular-nums; line-height: 1; margin: 0 5px;
+        }
+        .ctrl-label { font-size: 12px; color: #64748b; font-weight: bold; margin-bottom: 2px; }
+        .ctrl-unit { font-size: 10px; color: #64748b; margin-top: -5px; }
+        .phase-timer { font-size: 24px; font-family: monospace; font-weight: bold; color: #fff; }
+        .phase-card.active .phase-timer { color: var(--primary); }
+
+        .action-area { width: 100%; max-width: 500px; display: grid; grid-template-columns: 3fr 1fr; gap: 10px; }
+        .main-btn {
+            padding: 15px; font-size: 18px; font-weight: bold; border-radius: 12px; border: none; cursor: pointer; color: white;
+        }
+        #startBtn { background: var(--primary); }
+        #stopBtn { background: #ef4444; }
         
-        .controls { width: 100%; max-width: 400px; display: flex; gap: 10px; }
-        .ctrl-btn { flex: 1; padding: 15px; background: #334155; color: white; border:none; border-radius: 8px; font-size: 18px; }
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.98); z-index: 999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .connect-btn { padding: 25px 50px; background: var(--primary); color: white; border: none; border-radius: 50px; font-size: 22px; font-weight: bold; cursor: pointer; box-shadow: 0 0 20px rgba(59,130,246,0.5); }
+        #connStatus { margin-top:15px; color:#facc15; font-size:14px; text-align: center; white-space: pre-wrap; }
     </style>
 </head>
 <body>
 
-    <h2>V19 全碼修復版</h2>
-
-    <button id="mainBtn">1. 掃描並連線</button>
-
-    <div id="console-log">等待操作...</div>
-
-    <div class="dash">
-        <div class="box"><div id="rpm" class="val">0</div><div class="lbl">RPM</div></div>
-        <div class="box"><div id="res" class="val">1</div><div class="lbl">阻力</div></div>
+    <div id="overlay">
+        <button id="connectBtn" class="connect-btn" onclick="startConnection()">啟動 (連結 3.0SC)</button>
+        <div id="connStatus">
+            準備就緒。<br>將自動過濾裝置列表。
+        </div>
     </div>
 
-    <div class="controls">
-        <button class="ctrl-btn" onclick="setRes(-1)">- 阻力</button>
-        <button class="ctrl-btn" onclick="setRes(1)">+ 阻力</button>
+    <div class="header">
+        <span style="font-weight:bold; color:#64748b;">HORIZON V20 (SMART)</span>
+        <svg id="btIcon" class="bt-icon" viewBox="0 0 24 24"><path d="M17.71,7.71L12,2h-1v7.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L11,14.41V22h1l5.71-5.71L13.41,12L17.71,7.71z M13,5.83 l1.88,1.88L13,9.59V5.83z M13,18.17v-3.76l1.88,1.88L13,18.17z"/></svg>
     </div>
 
-<script>
-    // *** 關鍵修正：使用 128-bit 完整 UUID ***
-    // iOS WebKit 對短碼支援極差，必須用全碼
-    const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
-    const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
-    const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
+    <div class="dashboard">
+        <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
+        <div class="mini-card"><div id="pwrVal" class="mini-val c-pwr">0</div><div class="mini-lbl">WATT</div></div>
+        <div class="mini-card"><div id="spdVal" class="mini-val c-spd">0.0</div><div class="mini-lbl">KMH</div></div>
+        <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LVL</div></div>
+    </div>
 
-    let controlChar;
-    let currentRes = 1;
+    <div class="global-timer-box">
+        <div id="globalTimer" class="total-time-display">00:00</div>
+        <div id="totalLabel" class="total-label">總時長: -- 分鐘</div>
+    </div>
 
-    const logBox = document.getElementById('console-log');
-    const rpmDisp = document.getElementById('rpm');
-    const resDisp = document.getElementById('res');
+    <div class="phase-container">
+        <div id="card_warmup" class="phase-card">
+            <div class="phase-title"><span>WARM UP</span><span id="timer_warmup" class="phase-timer">03:00</span></div>
+            <div class="controls-row">
+                <div class="control-group">
+                    <button class="ctrl-btn" onclick="adjRes('warmup', -1)">-</button>
+                    <div class="ctrl-column"><span class="ctrl-label">RES</span><span id="val_res_warmup" class="ctrl-val" style="color:var(--c-res)">10</span></div>
+                    <button class="ctrl-btn" onclick="adjRes('warmup', 1)">+</button>
+                </div>
+                <div class="control-group">
+                    <button class="ctrl-btn" onclick="adjTime('warmup', -1)">-</button>
+                    <div class="ctrl-column"><span class="ctrl-label">TIME</span><span id="val_time_warmup" class="ctrl-val">3</span><span class="ctrl-unit">min</span></div>
+                    <button class="ctrl-btn" onclick="adjTime('warmup', 1)">+</button>
+                </div>
+            </div>
+        </div>
 
-    // 日誌工具
-    function log(msg) {
-        const t = new Date().toLocaleTimeString().split(' ')[0];
-        logBox.innerHTML += `<div>[${t}] ${msg}</div>`;
-        logBox.scrollTop = logBox.scrollHeight;
-    }
-
-    // 全域錯誤捕捉
-    window.onerror = function(msg) {
-        log("JS ERROR: " + msg);
-    };
-
-    // 按鈕事件綁定 (使用 addEventListener 更保險)
-    document.getElementById('mainBtn').addEventListener('click', async () => {
-        log("按鈕已點擊，開始流程..."); // 第一步確認按鈕有反應
-
-        if (!navigator.bluetooth) {
-            log("錯誤：找不到藍牙 API (請用 Bluefy)");
-            return;
-        }
-
-        try {
-            log("呼叫 requestDevice...");
-            
-            // 請求裝置 (使用 acceptAllDevices + 完整 UUID)
-            const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: [FTMS_UUID] // 這裡傳入的是長字串
-            });
-
-            log(`選取裝置: ${device.name}`);
-            log("正在連線 GATT...");
-            
-            const server = await device.gatt.connect();
-            log("GATT 連線成功！");
-
-            log("取得服務 (Service)...");
-            const service = await server.getPrimaryService(FTMS_UUID);
-            
-            log("取得特徵值 (Characteristics)...");
-            controlChar = await service.getCharacteristic(CTRL_UUID);
-            const dataChar = await service.getCharacteristic(DATA_UUID);
-            
-            log("啟動通知 (Notifications)...");
-            await dataChar.startNotifications();
-            dataChar.addEventListener('characteristicvaluechanged', parseData);
-
-            // 解鎖飛輪
-            log("發送解鎖指令...");
-            await sendHex(0x00);
-            await sendHex(0x07);
-
-            log(">>> 連線完成！ <<<");
-            document.getElementById('mainBtn').innerText = "已連線";
-            document.getElementById('mainBtn').style.background = "#10b981";
-
-            // 心跳包
-            setInterval(() => sendHex(0x07), 30000);
-
-        } catch (e) {
-            log("失敗: " + e);
-            // 如果是物件，嘗試印出內容
-            if (typeof e === 'object') log(JSON.stringify(e));
-        }
-    });
-
-    // 數據解析
-    function parseData(event) {
-        const val = event.target.value;
-        const flags = val.getUint16(0, true);
-        let offset = 2;
-
-        // Speed (Bit 0)
-        if ((flags & 0x01) === 0) offset += 2;
-        // Avg Speed (Bit 1)
-        if (flags & 0x02) offset += 2;
-        // Cadence (Bit 2)
-        if (flags & 0x04) {
-            const rpm = val.getUint16(offset, true) * 0.5;
-            rpmDisp.innerText = Math.floor(rpm);
-            offset += 2;
-        }
-        // Skip others to find Resistance
-        if (flags & 0x08) offset += 2;
-        if (flags & 0x10) offset += 3;
-        
-        // Resistance (Bit 5)
-        if (flags & 0x20) {
-            const r = val.getInt16(offset, true);
-            if (r > 0) {
-                currentRes = r;
-                resDisp.innerText = r;
-            }
-        }
-    }
-
-    // 阻力控制
-    async function setRes(delta) {
-        if (!controlChar) {
-            log("尚未連線");
-            return;
-        }
-        currentRes += delta;
-        if (currentRes < 1) currentRes = 1;
-        if (currentRes > 32) currentRes = 32;
-        resDisp.innerText = currentRes;
-
-        const target = currentRes * 10;
-        const buffer = new ArrayBuffer(3);
-        const view = new DataView(buffer);
-        view.setUint8(0, 0x04);
-        view.setUint16(1, target, true); // Little Endian
-        
-        log(`設定阻力: ${currentRes}`);
-        await controlChar.writeValue(buffer).catch(e => log("寫入錯誤:"+e));
-    }
-
-    async function sendHex(byte) {
-        if(controlChar) await controlChar.writeValue(new Uint8Array([byte])).catch(()=>{});
-    }
-
-</script>
-</body>
-</html>
+        <div id="card_workout" class="phase-card">
+            <div class="phase-title"><span>WORKOUT</span><span id="timer_workout" class="phase-timer">15:00</span></div>
+            <div class="controls-row">
+                <div class="control-group">
+                    <button class="ctrl-btn" onclick="adjRes('workout', -1)">-</button>
+                    <div class="ctrl-column"><span class="ctrl-label">RES</span><span id="val_res_workout" class="ctrl-val" style="color:var(--c-res)">24</span></div>
+                    <button class="ctrl-btn" onclick="adjRes('workout', 1)">+</button>
+                </div>
+                <div class="control-group">
+                    <button class="ctrl-btn" onclick="adj
