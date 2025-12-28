@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon Trainer V11 (Retry)</title>
+    <title>Horizon Trainer V12 (Debug)</title>
     <style>
         :root {
             --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6;
@@ -86,23 +86,20 @@
             display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
         .connect-btn { padding: 20px 40px; background: var(--primary); color: white; border: none; border-radius: 50px; font-size: 20px; font-weight: bold; cursor: pointer; }
-        
-        /* Loading Status */
-        #connStatus { margin-top:10px; color:#facc15; font-size:14px; display:none; }
+        #connStatus { margin-top:15px; color:#facc15; font-size:14px; text-align: center; line-height: 1.5; white-space: pre-wrap; }
     </style>
 </head>
 <body>
 
     <div id="overlay">
-        <button id="connectBtn" class="connect-btn">連線 3.0SC</button>
-        <div id="connStatus">正在嘗試連線...</div>
-        <p style="color:#64748b; margin-top:20px; text-align:center; font-size:12px;">
-            提示：若連線失敗，請先至 iPad 藍牙設定<br>「忘記此裝置」並重啟飛輪。
-        </p>
+        <button id="connectBtn" class="connect-btn">掃描並連線 (V12)</button>
+        <div id="connStatus">
+            準備就緒。<br>請確認 iPad 已解除與飛輪的系統配對。
+        </div>
     </div>
 
     <div class="header">
-        <span style="font-weight:bold; color:#64748b;">HORIZON V11 (RETRY)</span>
+        <span style="font-weight:bold; color:#64748b;">HORIZON V12 (DEBUG)</span>
         <svg id="btIcon" class="bt-icon" viewBox="0 0 24 24"><path d="M17.71,7.71L12,2h-1v7.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L11,14.41V22h1l5.71-5.71L13.41,12L17.71,7.71z M13,5.83 l1.88,1.88L13,9.59V5.83z M13,18.17v-3.76l1.88,1.88L13,18.17z"/></svg>
     </div>
 
@@ -300,164 +297,4 @@
     window.adjTime = function(phase, delta) {
         let p = phases[phase];
         p.mins += delta;
-        if (p.mins < 1) p.mins = 1;
-        document.getElementById(`val_time_${phase}`).innerText = p.mins;
-        if (currentStatus === 'IDLE') {
-            p.remainingSecs = p.mins * 60;
-            document.getElementById(`timer_${phase}`).innerText = formatTime(p.remainingSecs);
-            updateTotalLabel();
-        }
-    };
-
-    window.adjRes = function(phase, delta) {
-        let p = phases[phase];
-        p.res += delta;
-        if (p.res < 1) p.res = 1;
-        if (p.res > 32) p.res = 32;
-        document.getElementById(`val_res_${phase}`).innerText = p.res;
-        if (currentStatus === phase.toUpperCase()) {
-            setResistance(p.res);
-        }
-    };
-
-    function resetTimers() {
-        for (let key in phases) {
-            let p = phases[key];
-            p.remainingSecs = p.mins * 60;
-            document.getElementById(`timer_${key}`).innerText = formatTime(p.remainingSecs);
-        }
-        updateTotalLabel();
-        ui.globalTimer.innerText = "00:00";
-    }
-
-    function updateTotalLabel() {
-        let total = phases.warmup.mins + phases.workout.mins + phases.cooldown.mins;
-        ui.totalLabel.innerText = `總時長: ${total} 分鐘`;
-    }
-
-    function formatTime(sec) {
-        let m = Math.floor(sec / 60);
-        let s = sec % 60;
-        return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
-    }
-
-    // Bluetooth Logic with Retry
-    ui.connectBtn.onclick = async () => {
-        ui.connectBtn.innerText = "掃描中...";
-        ui.connStatus.style.display = 'none';
-
-        try {
-            // 使用 acceptAllDevices 讓列表最完整
-            const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: [FTMS_UUID]
-            });
-            
-            // 開始連線嘗試 (帶重試功能)
-            await connectWithRetry(device, 3);
-
-        } catch (e) {
-            alert("操作失敗: " + e.message);
-            ui.connectBtn.innerText = "重試連線";
-            ui.connStatus.style.display = 'none';
-        }
-    };
-
-    async function connectWithRetry(device, retries) {
-        ui.connStatus.style.display = 'block';
-        for (let i = 0; i < retries; i++) {
-            try {
-                ui.connStatus.innerText = `連線中... (嘗試 ${i + 1}/${retries})`;
-                await connectDevice(device);
-                return; // 成功則退出
-            } catch (error) {
-                console.error(error);
-                if (i === retries - 1) throw error; // 最後一次也失敗則拋出錯誤
-                // 等待 1 秒後重試
-                await new Promise(r => setTimeout(r, 1000));
-            }
-        }
-    }
-
-    async function connectDevice(device) {
-        device.addEventListener('gattserverdisconnected', onDisconnect);
-        const server = await device.gatt.connect();
-        
-        ui.connStatus.innerText = "取得服務中...";
-        const service = await server.getPrimaryService(FTMS_UUID);
-        
-        controlChar = await service.getCharacteristic(CTRL_UUID);
-        const dataChar = await service.getCharacteristic(DATA_UUID);
-        await dataChar.startNotifications();
-        dataChar.addEventListener('characteristicvaluechanged', parseData);
-
-        await sendHex(0x00); 
-        await sendHex(0x07); 
-        
-        ui.overlay.style.display = 'none';
-        ui.btIcon.classList.add('connected');
-    }
-
-    async function setResistance(val) {
-        val = parseInt(val);
-        lastCmdTime = Date.now(); 
-        ui.res.innerText = val; 
-        await setResistanceInternal(val);
-    }
-
-    async function setResistanceInternal(val) {
-        if (!controlChar) return;
-        const target = val * 10;
-        const buffer = new ArrayBuffer(3);
-        const view = new DataView(buffer);
-        view.setUint8(0, 0x04);
-        view.setUint16(1, target, true);
-        try { await controlChar.writeValue(buffer); } catch(e) {}
-    }
-
-    function parseData(event) {
-        const val = event.target.value;
-        const flags = val.getUint16(0, true);
-        let offset = 2;
-
-        if ((flags & 0x01) === 0) { 
-            ui.spd.innerText = (val.getUint16(offset, true) * 0.01).toFixed(1);
-            offset += 2;
-        }
-        if (flags & 0x02) offset += 2;
-        if (flags & 0x04) { 
-            ui.rpm.innerText = Math.floor(val.getUint16(offset, true) * 0.5);
-            offset += 2;
-        }
-        if (flags & 0x08) offset += 2;
-        if (flags & 0x10) offset += 3;
-        
-        if (flags & 0x20) { 
-            const r = val.getInt16(offset, true);
-            if (r > 0) {
-                if (Date.now() - lastCmdTime > 3000) {
-                    ui.res.innerText = r;
-                }
-            }
-            offset += 2;
-        }
-        
-        if (flags & 0x40) { 
-            ui.pwr.innerText = val.getInt16(offset, true);
-            offset += 2;
-        }
-    }
-
-    async function sendHex(byte) {
-        if(controlChar) await controlChar.writeValue(new Uint8Array([byte])).catch(()=>{});
-    }
-
-    function onDisconnect() {
-        ui.btIcon.classList.remove('connected');
-        stopWorkout();
-        alert("已斷線");
-        location.reload();
-    }
-</script>
-</body>
-</html>
+        if (p
