@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon Trainer V16 (Auto)</title>
+    <title>Horizon Trainer V17 (Stable)</title>
     <style>
         :root {
             --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6;
@@ -50,6 +50,7 @@
         .phase-title { font-weight: bold; color: var(--text-muted); font-size: 14px; letter-spacing: 1px; display: flex; justify-content: space-between; }
         .phase-card.active .phase-title { color: var(--primary); }
 
+        /* Controls */
         .controls-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
         .control-group { 
             display: flex; align-items: center; gap: 5px; 
@@ -85,21 +86,20 @@
             background: rgba(15, 23, 42, 0.98); z-index: 999;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
-        .connect-btn { padding: 20px 40px; background: var(--primary); color: white; border: none; border-radius: 50px; font-size: 20px; font-weight: bold; cursor: pointer; }
-        #connStatus { margin-top:15px; color:#facc15; font-size:14px; text-align: center; line-height: 1.5; white-space: pre-wrap; }
+        .connect-btn { padding: 25px 50px; background: var(--primary); color: white; border: none; border-radius: 50px; font-size: 22px; font-weight: bold; cursor: pointer; box-shadow: 0 0 20px rgba(59,130,246,0.5); }
+        #connStatus { margin-top:15px; color:#facc15; font-size:14px; text-align: center; }
+        #debugLog { position:fixed; bottom:5px; left:5px; font-size:10px; color:#555; pointer-events:none; }
     </style>
 </head>
 <body>
 
     <div id="overlay">
-        <button id="connectBtn" class="connect-btn">啟動 (連結 3.0SC)</button>
-        <div id="connStatus">
-            準備就緒。<br>將自動嘗試搜尋 "3.0SC"
-        </div>
+        <button id="connectBtn" class="connect-btn">掃描並連線</button>
+        <div id="connStatus">V17 穩定版</div>
     </div>
 
     <div class="header">
-        <span style="font-weight:bold; color:#64748b;">HORIZON V16 (AUTO)</span>
+        <span style="font-weight:bold; color:#64748b;">HORIZON V17 (STABLE)</span>
         <svg id="btIcon" class="bt-icon" viewBox="0 0 24 24"><path d="M17.71,7.71L12,2h-1v7.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L11,14.41V22h1l5.71-5.71L13.41,12L17.71,7.71z M13,5.83 l1.88,1.88L13,9.59V5.83z M13,18.17v-3.76l1.88,1.88L13,18.17z"/></svg>
     </div>
 
@@ -169,11 +169,11 @@
         <button id="startBtn" class="main-btn">START WORKOUT</button>
         <button id="stopBtn" class="main-btn">STOP</button>
     </div>
+    
+    <div id="debugLog"></div>
 
 <script>
-    // Config
-    const TARGET_NAME = "3.0SC"; 
-    // 重要：保持 V15 的字串格式 UUID
+    // V15 的字串 UUID (最穩定)
     const FTMS_UUID = "1826";  
     const DATA_UUID = "2ad2";  
     const CTRL_UUID = "2ad9";  
@@ -204,4 +204,177 @@
         totalLabel: document.getElementById('totalLabel'),
         rpm: document.getElementById('rpmVal'),
         pwr: document.getElementById('pwrVal'),
-        spd: document
+        spd: document.getElementById('spdVal'),
+        res: document.getElementById('resVal'),
+        log: document.getElementById('debugLog')
+    };
+
+    updateTotalLabel();
+    
+    function debug(msg) {
+        ui.log.innerText = msg;
+        console.log(msg);
+    }
+
+    // --- Bluetooth Logic (Back to V15 Stable) ---
+
+    ui.connectBtn.onclick = async () => {
+        ui.connectBtn.innerText = "掃描中...";
+        ui.connStatus.innerText = "請在列表中選擇 3.0SC";
+
+        try {
+            // 放棄 getDevices 與 name filter，回歸最穩定的 acceptAllDevices
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: [FTMS_UUID] 
+            });
+            
+            // 帶重試機制的連線
+            await connectWithRetry(device, 3);
+
+        } catch (e) {
+            let errorMsg = typeof e === 'string' ? e : (e.message || JSON.stringify(e));
+            if(errorMsg.includes("cancelled")) {
+                ui.connStatus.innerText = "使用者取消";
+            } else {
+                alert("錯誤: " + errorMsg);
+                ui.connStatus.innerText = "連線失敗";
+            }
+            ui.connectBtn.innerText = "掃描並連線";
+        }
+    };
+
+    async function connectWithRetry(device, retries) {
+        for (let i = 0; i < retries; i++) {
+            try {
+                ui.connStatus.innerText = `連線中... (${i + 1})`;
+                debug(`Connect attempt ${i+1}`);
+                await connectDevice(device);
+                return; 
+            } catch (error) {
+                console.error(error);
+                if (i === retries - 1) throw error; 
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
+    }
+
+    async function connectDevice(device) {
+        device.addEventListener('gattserverdisconnected', onDisconnect);
+        const server = await device.gatt.connect();
+        
+        ui.connStatus.innerText = "取得服務...";
+        const service = await server.getPrimaryService(FTMS_UUID); 
+        
+        controlChar = await service.getCharacteristic(CTRL_UUID); 
+        const dataChar = await service.getCharacteristic(DATA_UUID); 
+        await dataChar.startNotifications();
+        dataChar.addEventListener('characteristicvaluechanged', parseData);
+
+        await sendHex(0x00); 
+        await sendHex(0x07); 
+        
+        ui.overlay.style.display = 'none';
+        ui.btIcon.classList.add('connected');
+        debug("Connected!");
+    }
+
+    // --- Workout Logic ---
+
+    ui.startBtn.onclick = () => {
+        if (currentStatus !== 'IDLE') return;
+        sendHex(0x07).then(() => {
+            startPhase('WARMUP');
+        });
+    };
+
+    ui.stopBtn.onclick = stopWorkout;
+
+    function startPhase(phaseName) {
+        clearInterval(workoutInterval);
+        clearInterval(keeperInterval);
+        
+        currentStatus = phaseName;
+        debug(`Phase: ${phaseName}`);
+        
+        document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
+        let pKey = phaseName.toLowerCase();
+        let pData = phases[pKey];
+
+        if (phaseName === 'WARMUP') {
+            updateTotalLabel();
+            totalSecondsRemaining = (phases.warmup.mins + phases.workout.mins + phases.cooldown.mins) * 60;
+            ui.startBtn.innerText = "RUNNING...";
+            ui.startBtn.disabled = true;
+            ui.startBtn.style.opacity = 0.5;
+        }
+
+        document.getElementById(`card_${pKey}`).classList.add('active');
+
+        // Command logic: Send twice
+        setResistance(pData.res);
+        setTimeout(() => setResistance(pData.res), 800);
+
+        // Keeper Logic (Re-send every 3s)
+        keeperInterval = setInterval(() => {
+            if (currentStatus === phaseName) {
+                setResistanceInternal(phases[pKey].res);
+            }
+        }, 3000);
+
+        workoutInterval = setInterval(() => tick(pKey), 1000);
+    }
+
+    function tick(phaseKey) {
+        if (phases[phaseKey].remainingSecs > 0) {
+            phases[phaseKey].remainingSecs--;
+            document.getElementById(`timer_${phaseKey}`).innerText = formatTime(phases[phaseKey].remainingSecs);
+        }
+
+        if (totalSecondsRemaining > 0) {
+            totalSecondsRemaining--;
+            ui.globalTimer.innerText = formatTime(totalSecondsRemaining);
+        }
+
+        if (phases[phaseKey].remainingSecs <= 0) {
+            nextPhase(phaseKey);
+        }
+    }
+
+    function nextPhase(current) {
+        if (current === 'warmup') startPhase('WORKOUT');
+        else if (current === 'workout') startPhase('COOLDOWN');
+        else if (current === 'cooldown') finishWorkout();
+    }
+
+    function stopWorkout() {
+        clearInterval(workoutInterval);
+        clearInterval(keeperInterval);
+        currentStatus = 'IDLE';
+        ui.startBtn.innerText = "START WORKOUT";
+        ui.startBtn.disabled = false;
+        ui.startBtn.style.opacity = 1;
+        document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
+        resetTimers();
+        setResistance(1); 
+        debug("Stopped");
+    }
+
+    function finishWorkout() {
+        clearInterval(workoutInterval);
+        clearInterval(keeperInterval);
+        currentStatus = 'FINISHED';
+        ui.globalTimer.innerText = "DONE!";
+        ui.startBtn.innerText = "FINISHED";
+        setResistance(1); 
+        alert("訓練完成！");
+        setTimeout(stopWorkout, 3000);
+    }
+
+    window.adjTime = function(phase, delta) {
+        let p = phases[phase];
+        p.mins += delta;
+        if (p.mins < 1) p.mins = 1;
+        document.getElementById(`val_time_${phase}`).innerText = p.mins;
+        if (currentStatus === 'IDLE') {
+            p.remainingSecs = p.mins * 6
