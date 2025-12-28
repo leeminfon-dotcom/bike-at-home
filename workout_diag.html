@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V21 (Debug)</title>
+    <title>Horizon V22 (Execution Fix)</title>
     <style>
         :root { --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6; --text: #f8fafc; --text-muted: #94a3b8; }
         body {
             font-family: -apple-system, monospace; background: var(--bg); color: var(--text);
             margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center;
-            min-height: 100vh; touch-action: manipulation; padding-bottom: 150px; /* 留給 Debug 視窗 */
+            min-height: 100vh; touch-action: manipulation; padding-bottom: 150px;
         }
 
-        /* 除錯視窗 (永遠置底) */
+        /* 除錯視窗 */
         #console-log {
             position: fixed; bottom: 0; left: 0; width: 100%; height: 120px;
             background: #000; color: #0f0; border-top: 2px solid #555;
@@ -22,7 +22,6 @@
 
         .header { width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         
-        /* 儀表板 */
         .dashboard { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; width: 100%; max-width: 500px; margin-bottom: 20px; }
         .mini-card { background: var(--surface); padding: 10px 5px; border-radius: 12px; text-align: center; }
         .mini-val { font-size: 24px; font-weight: 800; line-height: 1; }
@@ -30,12 +29,8 @@
         
         .c-rpm { color: #10b981; } .c-pwr { color: #f59e0b; } .c-spd { color: #06b6d4; } .c-res { color: #ec4899; }
 
-        /* 階段卡片 */
         .phase-container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
-        .phase-card {
-            background: var(--surface); border: 2px solid #334155;
-            border-radius: 16px; padding: 15px; transition: 0.3s;
-        }
+        .phase-card { background: var(--surface); border: 2px solid #334155; border-radius: 16px; padding: 15px; transition: 0.3s; }
         .phase-card.active { border-color: var(--primary); background: #17253d; }
         .phase-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px; font-size: 14px; }
         .phase-timer { font-family: monospace; font-size: 18px; color: var(--primary); }
@@ -45,41 +40,24 @@
         .ctrl-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: #475569; color: white; font-size: 20px; }
         .ctrl-val { font-size: 20px; font-weight: bold; }
 
-        /* 按鈕區 */
         .action-area { width: 100%; max-width: 500px; display: flex; gap: 10px; margin-bottom: 20px; }
         .main-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; font-size: 16px; color: white; cursor: pointer; }
         #connectBtn { background: var(--primary); width: 100%; max-width: 500px; margin-bottom: 20px; font-size: 20px; }
         #startBtn { background: #10b981; }
         #stopBtn { background: #ef4444; }
-
-    </style>
-    
-    <script>
-        window.onerror = function(msg, url, line) {
-            const logDiv = document.getElementById('console-log');
-            if(logDiv) {
-                logDiv.innerHTML += `<div style="color:red">ERROR: ${msg} (Line ${line})</div>`;
-            } else {
-                alert("CRITICAL: " + msg);
-            }
-        };
         
-        function debug(msg) {
-            const d = new Date();
-            const ts = `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
-            const logDiv = document.getElementById('console-log');
-            if(logDiv) {
-                logDiv.innerHTML += `<div><span style="color:#666">[${ts}]</span> ${msg}</div>`;
-                logDiv.scrollTop = logDiv.scrollHeight;
-            }
-            console.log(msg);
+        /* 錯誤條 */
+        #sys-error {
+            display: none; background: red; color: white; padding: 10px; width: 100%; text-align: center;
         }
-    </script>
+    </style>
 </head>
 <body>
 
+    <div id="sys-error"></div>
+
     <div class="header">
-        <span style="font-weight:bold;">HORIZON V21 (DEBUG)</span>
+        <span style="font-weight:bold;">HORIZON V22 (FIXED)</span>
         <span id="connState">未連線</span>
     </div>
 
@@ -139,4 +117,16 @@
                 <div class="control-group">
                     <button class="ctrl-btn" onclick="adjTime('cooldown', -1)">-</button>
                     <span id="val_time_cooldown" class="ctrl-val">3m</span>
-                    <button class="ctrl-btn" onclick="adjTime('cooldown',
+                    <button class="ctrl-btn" onclick="adjTime('cooldown', 1)">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="console-log">Waiting for JS...</div>
+
+<script>
+    // 0. 基礎工具 (確保最先執行)
+    const logBox = document.getElementById('console-log');
+    
+    //
