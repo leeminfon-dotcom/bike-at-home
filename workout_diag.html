@@ -2,299 +2,145 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon Trainer V12 (Debug)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V13 System Check</title>
     <style>
-        :root {
-            --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6;
-            --text: #f8fafc; --text-muted: #94a3b8;
-            --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: var(--bg); color: var(--text);
-            margin: 0; padding: 15px;
-            display: flex; flex-direction: column; align-items: center;
-            min-height: 100vh; touch-action: manipulation;
-        }
-
-        .header { width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .bt-icon { width: 24px; height: 24px; fill: #64748b; transition: 0.3s; }
-        .bt-icon.connected { fill: var(--primary); filter: drop-shadow(0 0 5px var(--primary)); }
-
-        .dashboard {
-            display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;
-            width: 100%; max-width: 500px; margin-bottom: 20px;
-        }
-        .mini-card { background: var(--surface); padding: 10px 5px; border-radius: 12px; text-align: center; }
-        .mini-val { font-size: 24px; font-weight: 800; line-height: 1; }
-        .mini-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
-        .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
-
-        .global-timer-box {
-            width: 100%; max-width: 500px; background: #000; border-radius: 16px;
-            padding: 15px; margin-bottom: 20px; text-align: center; border: 1px solid #333;
-            box-sizing: border-box;
-        }
-        .total-time-display { font-size: 48px; font-weight: bold; font-family: monospace; color: white; letter-spacing: 2px; }
-        .total-label { color: #666; font-size: 12px; margin-top: 5px; }
-
-        .phase-container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
-        .phase-card {
-            background: var(--surface); border: 2px solid #334155;
-            border-radius: 16px; padding: 15px; transition: 0.3s;
-            display: flex; flex-direction: column; gap: 10px;
-            position: relative; overflow: hidden;
-        }
-        .phase-card.active { border-color: var(--primary); background: #17253d; box-shadow: 0 0 20px rgba(59,130,246,0.15); }
-        .phase-title { font-weight: bold; color: var(--text-muted); font-size: 14px; letter-spacing: 1px; display: flex; justify-content: space-between; }
-        .phase-card.active .phase-title { color: var(--primary); }
-
-        .controls-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-        .control-group { 
-            display: flex; align-items: center; gap: 5px; 
-            background: rgba(0,0,0,0.2); 
-            padding: 8px 12px; border-radius: 12px; 
-            flex: 1; justify-content: center;
-        }
-        .ctrl-column { display: flex; flex-direction: column; align-items: center; }
-        .ctrl-btn {
-            width: 44px; height: 44px; border-radius: 50%; border: none;
-            background: #334155; color: white; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: 0.1s;
-        }
-        .ctrl-btn:active { background: var(--primary); transform: scale(0.95); }
-        .ctrl-val { 
-            font-size: 48px; font-weight: 800; width: 70px; text-align: center; 
-            font-variant-numeric: tabular-nums; line-height: 1; margin: 0 5px;
-        }
-        .ctrl-label { font-size: 12px; color: #64748b; font-weight: bold; margin-bottom: 2px; }
-        .ctrl-unit { font-size: 10px; color: #64748b; margin-top: -5px; }
-        .phase-timer { font-size: 24px; font-family: monospace; font-weight: bold; color: #fff; }
-        .phase-card.active .phase-timer { color: var(--primary); }
-
-        .action-area { width: 100%; max-width: 500px; display: grid; grid-template-columns: 3fr 1fr; gap: 10px; }
-        .main-btn {
-            padding: 15px; font-size: 18px; font-weight: bold; border-radius: 12px; border: none; cursor: pointer; color: white;
-        }
-        #startBtn { background: var(--primary); }
-        #stopBtn { background: #ef4444; }
+        body { font-family: monospace; background: #000; color: #fff; padding: 20px; max-width: 600px; margin: 0 auto; }
+        h3 { border-bottom: 1px solid #555; padding-bottom: 10px; color: #3b82f6; }
         
-        #overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.98); z-index: 999;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        /* 測試按鈕區 */
+        .btn-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        button { font-size: 16px; padding: 15px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        #btnA { background: #10b981; color: white; } /* 綠 */
+        #btnB { background: #f59e0b; color: black; } /* 黃 */
+        #btnC { background: #ef4444; color: white; } /* 紅 */
+        
+        /* 螢幕日誌區 */
+        #console { 
+            width: 100%; height: 300px; 
+            background: #111; border: 1px solid #333; 
+            color: #0f0; padding: 10px; 
+            overflow-y: scroll; font-size: 13px; 
+            white-space: pre-wrap; box-sizing: border-box;
         }
-        .connect-btn { padding: 20px 40px; background: var(--primary); color: white; border: none; border-radius: 50px; font-size: 20px; font-weight: bold; cursor: pointer; }
-        #connStatus { margin-top:15px; color:#facc15; font-size:14px; text-align: center; line-height: 1.5; white-space: pre-wrap; }
     </style>
 </head>
 <body>
 
-    <div id="overlay">
-        <button id="connectBtn" class="connect-btn">掃描並連線 (V12)</button>
-        <div id="connStatus">
-            準備就緒。<br>請確認 iPad 已解除與飛輪的系統配對。
-        </div>
+    <h3>V13 藍牙連線檢測工具</h3>
+
+    <div id="statusArea">正在載入 JS...</div>
+
+    <div class="btn-group">
+        <button id="btnA" onclick="testConnection('A')">策略 A: 搜尋名稱 "3.0SC"</button>
+        <button id="btnB" onclick="testConnection('B')">策略 B: 搜尋服務 FTMS</button>
+        <button id="btnC" onclick="testConnection('C')">策略 C: 掃描全部 (寬鬆)</button>
     </div>
 
-    <div class="header">
-        <span style="font-weight:bold; color:#64748b;">HORIZON V12 (DEBUG)</span>
-        <svg id="btIcon" class="bt-icon" viewBox="0 0 24 24"><path d="M17.71,7.71L12,2h-1v7.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L11,14.41V22h1l5.71-5.71L13.41,12L17.71,7.71z M13,5.83 l1.88,1.88L13,9.59V5.83z M13,18.17v-3.76l1.88,1.88L13,18.17z"/></svg>
-    </div>
-
-    <div class="dashboard">
-        <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
-        <div class="mini-card"><div id="pwrVal" class="mini-val c-pwr">0</div><div class="mini-lbl">WATT</div></div>
-        <div class="mini-card"><div id="spdVal" class="mini-val c-spd">0.0</div><div class="mini-lbl">KMH</div></div>
-        <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LVL</div></div>
-    </div>
-
-    <div class="global-timer-box">
-        <div id="globalTimer" class="total-time-display">00:00</div>
-        <div id="totalLabel" class="total-label">總時長: -- 分鐘</div>
-    </div>
-
-    <div class="phase-container">
-        <div id="card_warmup" class="phase-card">
-            <div class="phase-title"><span>WARM UP</span><span id="timer_warmup" class="phase-timer">03:00</span></div>
-            <div class="controls-row">
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjRes('warmup', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">RES</span><span id="val_res_warmup" class="ctrl-val" style="color:var(--c-res)">10</span></div>
-                    <button class="ctrl-btn" onclick="adjRes('warmup', 1)">+</button>
-                </div>
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjTime('warmup', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">TIME</span><span id="val_time_warmup" class="ctrl-val">3</span><span class="ctrl-unit">min</span></div>
-                    <button class="ctrl-btn" onclick="adjTime('warmup', 1)">+</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="card_workout" class="phase-card">
-            <div class="phase-title"><span>WORKOUT</span><span id="timer_workout" class="phase-timer">15:00</span></div>
-            <div class="controls-row">
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjRes('workout', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">RES</span><span id="val_res_workout" class="ctrl-val" style="color:var(--c-res)">24</span></div>
-                    <button class="ctrl-btn" onclick="adjRes('workout', 1)">+</button>
-                </div>
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjTime('workout', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">TIME</span><span id="val_time_workout" class="ctrl-val">15</span><span class="ctrl-unit">min</span></div>
-                    <button class="ctrl-btn" onclick="adjTime('workout', 1)">+</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="card_cooldown" class="phase-card">
-            <div class="phase-title"><span>COOL DOWN</span><span id="timer_cooldown" class="phase-timer">03:00</span></div>
-            <div class="controls-row">
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjRes('cooldown', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">RES</span><span id="val_res_cooldown" class="ctrl-val" style="color:var(--c-res)">10</span></div>
-                    <button class="ctrl-btn" onclick="adjRes('cooldown', 1)">+</button>
-                </div>
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjTime('cooldown', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">TIME</span><span id="val_time_cooldown" class="ctrl-val">3</span><span class="ctrl-unit">min</span></div>
-                    <button class="ctrl-btn" onclick="adjTime('cooldown', 1)">+</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="action-area">
-        <button id="startBtn" class="main-btn">START WORKOUT</button>
-        <button id="stopBtn" class="main-btn">STOP</button>
-    </div>
+    <label>系統日誌 (System Log):</label>
+    <div id="console"></div>
 
 <script>
+    // 1. 初始化日誌系統
+    const logBox = document.getElementById('console');
+    const statusArea = document.getElementById('statusArea');
+
+    function log(msg, type='info') {
+        const t = new Date().toLocaleTimeString();
+        let color = '#0f0';
+        if(type==='error') color = '#f55';
+        if(type==='warn') color = '#ff0';
+        
+        logBox.innerHTML += `<div style="color:${color}">[${t}] ${msg}</div>`;
+        logBox.scrollTop = logBox.scrollHeight;
+        console.log(msg);
+    }
+
+    // 2. 錯誤捕捉 (全域)
+    window.onerror = function(msg, url, line) {
+        log(`CRITICAL ERROR: ${msg} (Line: ${line})`, 'error');
+        return false;
+    };
+
+    // 3. 環境檢查 (立即執行)
+    log("--- 系統啟動 ---");
+    
+    // 檢查 HTTPS
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        log("警告: 非 HTTPS 環境，Web Bluetooth 將無法運作！", 'error');
+        statusArea.innerText = "環境錯誤: 請使用 HTTPS";
+    } else {
+        log("環境檢查: HTTPS/Localhost OK");
+    }
+
+    // 檢查 API 支援
+    if (!navigator.bluetooth) {
+        log("錯誤: 瀏覽器不支援 navigator.bluetooth", 'error');
+        log("PC 請用 Chrome/Edge，iPad 請用 Bluefy", 'warn');
+        statusArea.innerText = "瀏覽器不支援";
+    } else {
+        log("API 檢查: Bluetooth API 存在 (OK)");
+        statusArea.innerText = "系統就緒，請點擊按鈕測試";
+    }
+
+    // 4. 連線邏輯
     const FTMS_UUID = 0x1826;
-    const DATA_UUID = 0x2AD2;
     const CTRL_UUID = 0x2AD9;
 
-    let controlChar;
-    
-    // States
-    const phases = {
-        warmup: { mins: 3, res: 10, remainingSecs: 180 },
-        workout: { mins: 15, res: 24, remainingSecs: 900 },
-        cooldown: { mins: 3, res: 10, remainingSecs: 180 }
-    };
-    
-    let currentStatus = 'IDLE'; 
-    let workoutInterval = null;
-    let keeperInterval = null; 
-    let totalSecondsRemaining = 0;
-    let lastCmdTime = 0; 
-
-    const ui = {
-        overlay: document.getElementById('overlay'),
-        connectBtn: document.getElementById('connectBtn'),
-        connStatus: document.getElementById('connStatus'),
-        btIcon: document.getElementById('btIcon'),
-        startBtn: document.getElementById('startBtn'),
-        stopBtn: document.getElementById('stopBtn'),
-        globalTimer: document.getElementById('globalTimer'),
-        totalLabel: document.getElementById('totalLabel'),
-        rpm: document.getElementById('rpmVal'),
-        pwr: document.getElementById('pwrVal'),
-        spd: document.getElementById('spdVal'),
-        res: document.getElementById('resVal')
-    };
-
-    updateTotalLabel();
-
-    // Logic
-    ui.startBtn.onclick = () => {
-        if (currentStatus !== 'IDLE') return;
-        sendHex(0x07).then(() => {
-            startPhase('WARMUP');
-        });
-    };
-
-    ui.stopBtn.onclick = stopWorkout;
-
-    function startPhase(phaseName) {
-        clearInterval(workoutInterval);
-        clearInterval(keeperInterval);
+    async function testConnection(strategy) {
+        log(`\n>>> 啟動策略 ${strategy}...`);
         
-        currentStatus = phaseName;
-        
-        document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
-        let pKey = phaseName.toLowerCase();
-        let pData = phases[pKey];
-
-        if (phaseName === 'WARMUP') {
-            updateTotalLabel();
-            totalSecondsRemaining = (phases.warmup.mins + phases.workout.mins + phases.cooldown.mins) * 60;
-            ui.startBtn.innerText = "RUNNING...";
-            ui.startBtn.disabled = true;
-            ui.startBtn.style.opacity = 0.5;
-        }
-
-        document.getElementById(`card_${pKey}`).classList.add('active');
-
-        setResistance(pData.res);
-        setTimeout(() => setResistance(pData.res), 500);
-
-        keeperInterval = setInterval(() => {
-            if (currentStatus === phaseName) {
-                setResistanceInternal(phases[pKey].res);
+        try {
+            let options = {};
+            
+            // 不同的掃描參數
+            if (strategy === 'A') {
+                log("設定: filters name = '3.0SC'");
+                options = { 
+                    filters: [{ name: "3.0SC" }],
+                    optionalServices: [FTMS_UUID]
+                };
+            } 
+            else if (strategy === 'B') {
+                log("設定: filters services = [0x1826]");
+                options = { 
+                    filters: [{ services: [FTMS_UUID] }],
+                    optionalServices: [FTMS_UUID]
+                };
+            } 
+            else if (strategy === 'C') {
+                log("設定: acceptAllDevices = true");
+                options = { 
+                    acceptAllDevices: true,
+                    optionalServices: [FTMS_UUID]
+                };
             }
-        }, 3000);
 
-        workoutInterval = setInterval(() => tick(pKey), 1000);
-    }
+            log("正在呼叫 navigator.bluetooth.requestDevice...");
+            
+            const device = await navigator.bluetooth.requestDevice(options);
+            
+            log(`成功選取裝置: ${device.name} (ID: ${device.id})`, 'warn');
+            log("正在連線 GATT Server...");
+            
+            const server = await device.gatt.connect();
+            log("GATT 連線成功！");
+            
+            log("正在取得 FTMS 服務...");
+            const service = await server.getPrimaryService(FTMS_UUID);
+            log("服務取得成功！");
 
-    function tick(phaseKey) {
-        if (phases[phaseKey].remainingSecs > 0) {
-            phases[phaseKey].remainingSecs--;
-            document.getElementById(`timer_${phaseKey}`).innerText = formatTime(phases[phaseKey].remainingSecs);
+            log("正在取得 Control Point...");
+            const char = await service.getCharacteristic(CTRL_UUID);
+            log("特徵值取得成功！測試完成。");
+            
+            alert(`連線成功！\n裝置: ${device.name}\n策略 ${strategy} 有效。`);
+
+        } catch (e) {
+            log(`連線失敗: ${e.message || e}`, 'error');
+            log("完整錯誤物件: " + JSON.stringify(e));
         }
-
-        if (totalSecondsRemaining > 0) {
-            totalSecondsRemaining--;
-            ui.globalTimer.innerText = formatTime(totalSecondsRemaining);
-        }
-
-        if (phases[phaseKey].remainingSecs <= 0) {
-            nextPhase(phaseKey);
-        }
     }
-
-    function nextPhase(current) {
-        if (current === 'warmup') startPhase('WORKOUT');
-        else if (current === 'workout') startPhase('COOLDOWN');
-        else if (current === 'cooldown') finishWorkout();
-    }
-
-    function stopWorkout() {
-        clearInterval(workoutInterval);
-        clearInterval(keeperInterval);
-        currentStatus = 'IDLE';
-        ui.startBtn.innerText = "START WORKOUT";
-        ui.startBtn.disabled = false;
-        ui.startBtn.style.opacity = 1;
-        document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
-        resetTimers();
-        setResistance(1); 
-    }
-
-    function finishWorkout() {
-        clearInterval(workoutInterval);
-        clearInterval(keeperInterval);
-        currentStatus = 'FINISHED';
-        ui.globalTimer.innerText = "DONE!";
-        ui.startBtn.innerText = "FINISHED";
-        setResistance(1); 
-        alert("訓練完成！");
-        setTimeout(stopWorkout, 3000);
-    }
-
-    window.adjTime = function(phase, delta) {
-        let p = phases[phase];
-        p.mins += delta;
-        if (p
+</script>
+</body>
+</html>
