@@ -3,105 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon Trainer V20 (Smart Filter)</title>
+    <title>Horizon V21 (Debug)</title>
     <style>
-        :root {
-            --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6;
-            --text: #f8fafc; --text-muted: #94a3b8;
-            --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899;
-        }
+        :root { --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6; --text: #f8fafc; --text-muted: #94a3b8; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: var(--bg); color: var(--text);
-            margin: 0; padding: 15px;
-            display: flex; flex-direction: column; align-items: center;
-            min-height: 100vh; touch-action: manipulation;
+            font-family: -apple-system, monospace; background: var(--bg); color: var(--text);
+            margin: 0; padding: 15px; display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; touch-action: manipulation; padding-bottom: 150px; /* 留給 Debug 視窗 */
+        }
+
+        /* 除錯視窗 (永遠置底) */
+        #console-log {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 120px;
+            background: #000; color: #0f0; border-top: 2px solid #555;
+            font-size: 11px; padding: 10px; overflow-y: scroll;
+            z-index: 9999; box-sizing: border-box; white-space: pre-wrap;
         }
 
         .header { width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .bt-icon { width: 24px; height: 24px; fill: #64748b; transition: 0.3s; }
-        .bt-icon.connected { fill: var(--primary); filter: drop-shadow(0 0 5px var(--primary)); }
-
-        .dashboard {
-            display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;
-            width: 100%; max-width: 500px; margin-bottom: 20px;
-        }
+        
+        /* 儀表板 */
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; width: 100%; max-width: 500px; margin-bottom: 20px; }
         .mini-card { background: var(--surface); padding: 10px 5px; border-radius: 12px; text-align: center; }
         .mini-val { font-size: 24px; font-weight: 800; line-height: 1; }
-        .mini-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
-        .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
+        .mini-lbl { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+        
+        .c-rpm { color: #10b981; } .c-pwr { color: #f59e0b; } .c-spd { color: #06b6d4; } .c-res { color: #ec4899; }
 
-        .global-timer-box {
-            width: 100%; max-width: 500px; background: #000; border-radius: 16px;
-            padding: 15px; margin-bottom: 20px; text-align: center; border: 1px solid #333;
-            box-sizing: border-box;
-        }
-        .total-time-display { font-size: 48px; font-weight: bold; font-family: monospace; color: white; letter-spacing: 2px; }
-        .total-label { color: #666; font-size: 12px; margin-top: 5px; }
-
+        /* 階段卡片 */
         .phase-container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
         .phase-card {
             background: var(--surface); border: 2px solid #334155;
             border-radius: 16px; padding: 15px; transition: 0.3s;
-            display: flex; flex-direction: column; gap: 10px;
-            position: relative; overflow: hidden;
         }
-        .phase-card.active { border-color: var(--primary); background: #17253d; box-shadow: 0 0 20px rgba(59,130,246,0.15); }
-        .phase-title { font-weight: bold; color: var(--text-muted); font-size: 14px; letter-spacing: 1px; display: flex; justify-content: space-between; }
-        .phase-card.active .phase-title { color: var(--primary); }
+        .phase-card.active { border-color: var(--primary); background: #17253d; }
+        .phase-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px; font-size: 14px; }
+        .phase-timer { font-family: monospace; font-size: 18px; color: var(--primary); }
 
-        .controls-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-        .control-group { 
-            display: flex; align-items: center; gap: 5px; 
-            background: rgba(0,0,0,0.2); 
-            padding: 8px 12px; border-radius: 12px; 
-            flex: 1; justify-content: center;
-        }
-        .ctrl-column { display: flex; flex-direction: column; align-items: center; }
-        .ctrl-btn {
-            width: 44px; height: 44px; border-radius: 50%; border: none;
-            background: #334155; color: white; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: 0.1s;
-        }
-        .ctrl-btn:active { background: var(--primary); transform: scale(0.95); }
-        .ctrl-val { 
-            font-size: 48px; font-weight: 800; width: 70px; text-align: center; 
-            font-variant-numeric: tabular-nums; line-height: 1; margin: 0 5px;
-        }
-        .ctrl-label { font-size: 12px; color: #64748b; font-weight: bold; margin-bottom: 2px; }
-        .ctrl-unit { font-size: 10px; color: #64748b; margin-top: -5px; }
-        .phase-timer { font-size: 24px; font-family: monospace; font-weight: bold; color: #fff; }
-        .phase-card.active .phase-timer { color: var(--primary); }
+        .controls-row { display: flex; justify-content: space-between; gap: 10px; }
+        .control-group { background: rgba(0,0,0,0.3); padding: 8px; border-radius: 10px; flex: 1; display: flex; justify-content: space-between; align-items: center; }
+        .ctrl-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: #475569; color: white; font-size: 20px; }
+        .ctrl-val { font-size: 20px; font-weight: bold; }
 
-        .action-area { width: 100%; max-width: 500px; display: grid; grid-template-columns: 3fr 1fr; gap: 10px; }
-        .main-btn {
-            padding: 15px; font-size: 18px; font-weight: bold; border-radius: 12px; border: none; cursor: pointer; color: white;
-        }
-        #startBtn { background: var(--primary); }
+        /* 按鈕區 */
+        .action-area { width: 100%; max-width: 500px; display: flex; gap: 10px; margin-bottom: 20px; }
+        .main-btn { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: bold; font-size: 16px; color: white; cursor: pointer; }
+        #connectBtn { background: var(--primary); width: 100%; max-width: 500px; margin-bottom: 20px; font-size: 20px; }
+        #startBtn { background: #10b981; }
         #stopBtn { background: #ef4444; }
-        
-        #overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.98); z-index: 999;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-        }
-        .connect-btn { padding: 25px 50px; background: var(--primary); color: white; border: none; border-radius: 50px; font-size: 22px; font-weight: bold; cursor: pointer; box-shadow: 0 0 20px rgba(59,130,246,0.5); }
-        #connStatus { margin-top:15px; color:#facc15; font-size:14px; text-align: center; white-space: pre-wrap; }
+
     </style>
+    
+    <script>
+        window.onerror = function(msg, url, line) {
+            const logDiv = document.getElementById('console-log');
+            if(logDiv) {
+                logDiv.innerHTML += `<div style="color:red">ERROR: ${msg} (Line ${line})</div>`;
+            } else {
+                alert("CRITICAL: " + msg);
+            }
+        };
+        
+        function debug(msg) {
+            const d = new Date();
+            const ts = `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
+            const logDiv = document.getElementById('console-log');
+            if(logDiv) {
+                logDiv.innerHTML += `<div><span style="color:#666">[${ts}]</span> ${msg}</div>`;
+                logDiv.scrollTop = logDiv.scrollHeight;
+            }
+            console.log(msg);
+        }
+    </script>
 </head>
 <body>
 
-    <div id="overlay">
-        <button id="connectBtn" class="connect-btn" onclick="startConnection()">啟動 (連結 3.0SC)</button>
-        <div id="connStatus">
-            準備就緒。<br>將自動過濾裝置列表。
-        </div>
+    <div class="header">
+        <span style="font-weight:bold;">HORIZON V21 (DEBUG)</span>
+        <span id="connState">未連線</span>
     </div>
 
-    <div class="header">
-        <span style="font-weight:bold; color:#64748b;">HORIZON V20 (SMART)</span>
-        <svg id="btIcon" class="bt-icon" viewBox="0 0 24 24"><path d="M17.71,7.71L12,2h-1v7.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L11,14.41V22h1l5.71-5.71L13.41,12L17.71,7.71z M13,5.83 l1.88,1.88L13,9.59V5.83z M13,18.17v-3.76l1.88,1.88L13,18.17z"/></svg>
-    </div>
+    <button id="connectBtn" class="main-btn" onclick="startScan()">1. 掃描連線</button>
 
     <div class="dashboard">
         <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
@@ -110,35 +92,51 @@
         <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LVL</div></div>
     </div>
 
-    <div class="global-timer-box">
-        <div id="globalTimer" class="total-time-display">00:00</div>
-        <div id="totalLabel" class="total-label">總時長: -- 分鐘</div>
+    <div class="action-area">
+        <button id="startBtn" class="main-btn" onclick="startWorkoutRoutine()">START WORKOUT</button>
+        <button id="stopBtn" class="main-btn" onclick="stopWorkout()">STOP</button>
     </div>
 
     <div class="phase-container">
         <div id="card_warmup" class="phase-card">
-            <div class="phase-title"><span>WARM UP</span><span id="timer_warmup" class="phase-timer">03:00</span></div>
+            <div class="phase-header"><span>WARM UP</span><span id="timer_warmup" class="phase-timer">03:00</span></div>
             <div class="controls-row">
                 <div class="control-group">
                     <button class="ctrl-btn" onclick="adjRes('warmup', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">RES</span><span id="val_res_warmup" class="ctrl-val" style="color:var(--c-res)">10</span></div>
+                    <span id="val_res_warmup" class="ctrl-val c-res">10</span>
                     <button class="ctrl-btn" onclick="adjRes('warmup', 1)">+</button>
                 </div>
                 <div class="control-group">
                     <button class="ctrl-btn" onclick="adjTime('warmup', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">TIME</span><span id="val_time_warmup" class="ctrl-val">3</span><span class="ctrl-unit">min</span></div>
+                    <span id="val_time_warmup" class="ctrl-val">3m</span>
                     <button class="ctrl-btn" onclick="adjTime('warmup', 1)">+</button>
                 </div>
             </div>
         </div>
-
         <div id="card_workout" class="phase-card">
-            <div class="phase-title"><span>WORKOUT</span><span id="timer_workout" class="phase-timer">15:00</span></div>
+            <div class="phase-header"><span>WORKOUT</span><span id="timer_workout" class="phase-timer">15:00</span></div>
             <div class="controls-row">
                 <div class="control-group">
                     <button class="ctrl-btn" onclick="adjRes('workout', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">RES</span><span id="val_res_workout" class="ctrl-val" style="color:var(--c-res)">24</span></div>
+                    <span id="val_res_workout" class="ctrl-val c-res">24</span>
                     <button class="ctrl-btn" onclick="adjRes('workout', 1)">+</button>
                 </div>
                 <div class="control-group">
-                    <button class="ctrl-btn" onclick="adj
+                    <button class="ctrl-btn" onclick="adjTime('workout', -1)">-</button>
+                    <span id="val_time_workout" class="ctrl-val">15m</span>
+                    <button class="ctrl-btn" onclick="adjTime('workout', 1)">+</button>
+                </div>
+            </div>
+        </div>
+        <div id="card_cooldown" class="phase-card">
+            <div class="phase-header"><span>COOL DOWN</span><span id="timer_cooldown" class="phase-timer">03:00</span></div>
+            <div class="controls-row">
+                <div class="control-group">
+                    <button class="ctrl-btn" onclick="adjRes('cooldown', -1)">-</button>
+                    <span id="val_res_cooldown" class="ctrl-val c-res">10</span>
+                    <button class="ctrl-btn" onclick="adjRes('cooldown', 1)">+</button>
+                </div>
+                <div class="control-group">
+                    <button class="ctrl-btn" onclick="adjTime('cooldown', -1)">-</button>
+                    <span id="val_time_cooldown" class="ctrl-val">3m</span>
+                    <button class="ctrl-btn" onclick="adjTime('cooldown',
