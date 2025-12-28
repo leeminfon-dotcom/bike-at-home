@@ -3,409 +3,189 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon Trainer V18 (Final Fix)</title>
+    <title>Horizon Trainer V19 (Full UUID)</title>
     <style>
-        :root {
-            --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6;
-            --text: #f8fafc; --text-muted: #94a3b8;
-            --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: var(--bg); color: var(--text);
-            margin: 0; padding: 15px;
-            display: flex; flex-direction: column; align-items: center;
-            min-height: 100vh; touch-action: manipulation;
-        }
-
-        /* 錯誤攔截顯示區 */
-        #sys-error {
-            width: 100%; background: #ef4444; color: white; padding: 15px;
-            font-weight: bold; text-align: center; display: none; margin-bottom: 20px;
-            border-radius: 10px; border: 2px solid white; box-shadow: 0 0 20px red;
-        }
-
-        .header { width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .bt-icon { width: 24px; height: 24px; fill: #64748b; transition: 0.3s; }
-        .bt-icon.connected { fill: var(--primary); filter: drop-shadow(0 0 5px var(--primary)); }
-
-        .dashboard {
-            display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;
-            width: 100%; max-width: 500px; margin-bottom: 20px;
-        }
-        .mini-card { background: var(--surface); padding: 10px 5px; border-radius: 12px; text-align: center; }
-        .mini-val { font-size: 24px; font-weight: 800; line-height: 1; }
-        .mini-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
-        .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
-
-        .global-timer-box {
-            width: 100%; max-width: 500px; background: #000; border-radius: 16px;
-            padding: 15px; margin-bottom: 20px; text-align: center; border: 1px solid #333;
-            box-sizing: border-box;
-        }
-        .total-time-display { font-size: 48px; font-weight: bold; font-family: monospace; color: white; letter-spacing: 2px; }
-        .total-label { color: #666; font-size: 12px; margin-top: 5px; }
-
-        .phase-container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
-        .phase-card {
-            background: var(--surface); border: 2px solid #334155;
-            border-radius: 16px; padding: 15px; transition: 0.3s;
-            display: flex; flex-direction: column; gap: 10px;
-            position: relative; overflow: hidden;
-        }
-        .phase-card.active { border-color: var(--primary); background: #17253d; box-shadow: 0 0 20px rgba(59,130,246,0.15); }
-        .phase-title { font-weight: bold; color: var(--text-muted); font-size: 14px; letter-spacing: 1px; display: flex; justify-content: space-between; }
-        .phase-card.active .phase-title { color: var(--primary); }
-
-        .controls-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-        .control-group { 
-            display: flex; align-items: center; gap: 5px; 
-            background: rgba(0,0,0,0.2); 
-            padding: 8px 12px; border-radius: 12px; 
-            flex: 1; justify-content: center;
-        }
-        .ctrl-column { display: flex; flex-direction: column; align-items: center; }
-        .ctrl-btn {
-            width: 44px; height: 44px; border-radius: 50%; border: none;
-            background: #334155; color: white; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: 0.1s;
-        }
-        .ctrl-btn:active { background: var(--primary); transform: scale(0.95); }
-        .ctrl-val { 
-            font-size: 48px; font-weight: 800; width: 70px; text-align: center; 
-            font-variant-numeric: tabular-nums; line-height: 1; margin: 0 5px;
-        }
-        .ctrl-label { font-size: 12px; color: #64748b; font-weight: bold; margin-bottom: 2px; }
-        .ctrl-unit { font-size: 10px; color: #64748b; margin-top: -5px; }
-        .phase-timer { font-size: 24px; font-family: monospace; font-weight: bold; color: #fff; }
-        .phase-card.active .phase-timer { color: var(--primary); }
-
-        .action-area { width: 100%; max-width: 500px; display: grid; grid-template-columns: 3fr 1fr; gap: 10px; }
-        .main-btn {
-            padding: 15px; font-size: 18px; font-weight: bold; border-radius: 12px; border: none; cursor: pointer; color: white;
-        }
-        #startBtn { background: var(--primary); }
-        #stopBtn { background: #ef4444; }
+        :root { --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6; --text: #f8fafc; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 20px; display: flex; flex-direction: column; align-items: center; }
         
-        #overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(15, 23, 42, 0.98); z-index: 999;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        button {
+            background: var(--primary); color: white; border: none; padding: 25px; 
+            font-size: 22px; border-radius: 12px; width: 100%; max-width: 400px;
+            margin-bottom: 20px; font-weight: bold; cursor: pointer;
         }
-        /* 直接綁定 onclick，不依賴 JS 綁定 */
-        .connect-btn { padding: 25px 50px; background: var(--primary); color: white; border: none; border-radius: 50px; font-size: 22px; font-weight: bold; cursor: pointer; box-shadow: 0 0 20px rgba(59,130,246,0.5); }
-        #connStatus { margin-top:15px; color:#facc15; font-size:14px; text-align: center; }
-        #debugLog { position:fixed; bottom:5px; left:5px; font-size:10px; color:#555; pointer-events:none; }
+        button:active { opacity: 0.8; }
+
+        /* 日誌區 */
+        #console-log {
+            width: 100%; max-width: 400px; height: 200px;
+            background: #332b00; border: 2px solid #facc15; color: #facc15;
+            padding: 10px; font-family: monospace; font-size: 12px;
+            overflow-y: scroll; border-radius: 8px; box-sizing: border-box;
+        }
+
+        /* 儀表板簡化版 */
+        .dash { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 400px; margin-bottom: 20px; }
+        .box { background: var(--surface); padding: 15px; border-radius: 10px; text-align: center; }
+        .val { font-size: 32px; font-weight: bold; }
+        .lbl { font-size: 12px; color: #aaa; }
+        
+        .controls { width: 100%; max-width: 400px; display: flex; gap: 10px; }
+        .ctrl-btn { flex: 1; padding: 15px; background: #334155; color: white; border:none; border-radius: 8px; font-size: 18px; }
     </style>
 </head>
 <body>
 
-    <div id="sys-error"></div>
+    <h2>V19 全碼修復版</h2>
 
-    <div id="overlay">
-        <button id="connectBtn" class="connect-btn" onclick="startConnection()">掃描並連線 (V18)</button>
-        <div id="connStatus">
-            回歸 V15 連線核心<br>請在列表中選擇 3.0SC
-        </div>
+    <button id="mainBtn">1. 掃描並連線</button>
+
+    <div id="console-log">等待操作...</div>
+
+    <div class="dash">
+        <div class="box"><div id="rpm" class="val">0</div><div class="lbl">RPM</div></div>
+        <div class="box"><div id="res" class="val">1</div><div class="lbl">阻力</div></div>
     </div>
 
-    <div class="header">
-        <span style="font-weight:bold; color:#64748b;">HORIZON V18 (FINAL)</span>
-        <svg id="btIcon" class="bt-icon" viewBox="0 0 24 24"><path d="M17.71,7.71L12,2h-1v7.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L11,14.41V22h1l5.71-5.71L13.41,12L17.71,7.71z M13,5.83 l1.88,1.88L13,9.59V5.83z M13,18.17v-3.76l1.88,1.88L13,18.17z"/></svg>
+    <div class="controls">
+        <button class="ctrl-btn" onclick="setRes(-1)">- 阻力</button>
+        <button class="ctrl-btn" onclick="setRes(1)">+ 阻力</button>
     </div>
-
-    <div class="dashboard">
-        <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
-        <div class="mini-card"><div id="pwrVal" class="mini-val c-pwr">0</div><div class="mini-lbl">WATT</div></div>
-        <div class="mini-card"><div id="spdVal" class="mini-val c-spd">0.0</div><div class="mini-lbl">KMH</div></div>
-        <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LVL</div></div>
-    </div>
-
-    <div class="global-timer-box">
-        <div id="globalTimer" class="total-time-display">00:00</div>
-        <div id="totalLabel" class="total-label">總時長: -- 分鐘</div>
-    </div>
-
-    <div class="phase-container">
-        <div id="card_warmup" class="phase-card">
-            <div class="phase-title"><span>WARM UP</span><span id="timer_warmup" class="phase-timer">03:00</span></div>
-            <div class="controls-row">
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjRes('warmup', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">RES</span><span id="val_res_warmup" class="ctrl-val" style="color:var(--c-res)">10</span></div>
-                    <button class="ctrl-btn" onclick="adjRes('warmup', 1)">+</button>
-                </div>
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjTime('warmup', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">TIME</span><span id="val_time_warmup" class="ctrl-val">3</span><span class="ctrl-unit">min</span></div>
-                    <button class="ctrl-btn" onclick="adjTime('warmup', 1)">+</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="card_workout" class="phase-card">
-            <div class="phase-title"><span>WORKOUT</span><span id="timer_workout" class="phase-timer">15:00</span></div>
-            <div class="controls-row">
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjRes('workout', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">RES</span><span id="val_res_workout" class="ctrl-val" style="color:var(--c-res)">24</span></div>
-                    <button class="ctrl-btn" onclick="adjRes('workout', 1)">+</button>
-                </div>
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjTime('workout', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">TIME</span><span id="val_time_workout" class="ctrl-val">15</span><span class="ctrl-unit">min</span></div>
-                    <button class="ctrl-btn" onclick="adjTime('workout', 1)">+</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="card_cooldown" class="phase-card">
-            <div class="phase-title"><span>COOL DOWN</span><span id="timer_cooldown" class="phase-timer">03:00</span></div>
-            <div class="controls-row">
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjRes('cooldown', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">RES</span><span id="val_res_cooldown" class="ctrl-val" style="color:var(--c-res)">10</span></div>
-                    <button class="ctrl-btn" onclick="adjRes('cooldown', 1)">+</button>
-                </div>
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjTime('cooldown', -1)">-</button>
-                    <div class="ctrl-column"><span class="ctrl-label">TIME</span><span id="val_time_cooldown" class="ctrl-val">3</span><span class="ctrl-unit">min</span></div>
-                    <button class="ctrl-btn" onclick="adjTime('cooldown', 1)">+</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="action-area">
-        <button id="startBtn" class="main-btn" onclick="startWorkoutRoutine()">START WORKOUT</button>
-        <button id="stopBtn" class="main-btn" onclick="stopWorkout()">STOP</button>
-    </div>
-    
-    <div id="debugLog"></div>
 
 <script>
-    // 0. 全域錯誤攔截器 (防止靜默失敗)
-    window.onerror = function(msg, url, line) {
-        const errBox = document.getElementById('sys-error');
-        errBox.style.display = 'block';
-        errBox.innerHTML = `⚠️ 系統崩潰: ${msg} (Line: ${line})<br>請截圖並回報`;
-        return false;
-    };
-
-    // 1. 設定 (完全還原 V15 格式)
-    const FTMS_UUID = "1826";  
-    const DATA_UUID = "2ad2";  
-    const CTRL_UUID = "2ad9";  
+    // *** 關鍵修正：使用 128-bit 完整 UUID ***
+    // iOS WebKit 對短碼支援極差，必須用全碼
+    const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
+    const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
+    const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
 
     let controlChar;
-    
-    // States
-    const phases = {
-        warmup: { mins: 3, res: 10, remainingSecs: 180 },
-        workout: { mins: 15, res: 24, remainingSecs: 900 },
-        cooldown: { mins: 3, res: 10, remainingSecs: 180 }
-    };
-    
-    let currentStatus = 'IDLE'; 
-    let workoutInterval = null;
-    let keeperInterval = null; 
-    let totalSecondsRemaining = 0;
-    let lastCmdTime = 0; 
+    let currentRes = 1;
 
-    // UI Cache
-    const ui = {
-        overlay: document.getElementById('overlay'),
-        connectBtn: document.getElementById('connectBtn'),
-        connStatus: document.getElementById('connStatus'),
-        btIcon: document.getElementById('btIcon'),
-        startBtn: document.getElementById('startBtn'),
-        stopBtn: document.getElementById('stopBtn'),
-        globalTimer: document.getElementById('globalTimer'),
-        totalLabel: document.getElementById('totalLabel'),
-        rpm: document.getElementById('rpmVal'),
-        pwr: document.getElementById('pwrVal'),
-        spd: document.getElementById('spdVal'),
-        res: document.getElementById('resVal'),
-        log: document.getElementById('debugLog')
-    };
+    const logBox = document.getElementById('console-log');
+    const rpmDisp = document.getElementById('rpm');
+    const resDisp = document.getElementById('res');
 
-    // Init
-    updateTotalLabel();
-    
-    function debug(msg) {
-        if(ui.log) ui.log.innerText = msg;
-        console.log(msg);
+    // 日誌工具
+    function log(msg) {
+        const t = new Date().toLocaleTimeString().split(' ')[0];
+        logBox.innerHTML += `<div>[${t}] ${msg}</div>`;
+        logBox.scrollTop = logBox.scrollHeight;
     }
 
-    // --- Bluetooth Logic (100% V15 Logic) ---
+    // 全域錯誤捕捉
+    window.onerror = function(msg) {
+        log("JS ERROR: " + msg);
+    };
 
-    // 使用全域 function 以便 HTML onclick 呼叫
-    window.startConnection = async function() {
-        ui.connectBtn.innerText = "掃描中...";
-        ui.connStatus.innerText = "請在列表中選擇 3.0SC";
+    // 按鈕事件綁定 (使用 addEventListener 更保險)
+    document.getElementById('mainBtn').addEventListener('click', async () => {
+        log("按鈕已點擊，開始流程..."); // 第一步確認按鈕有反應
+
+        if (!navigator.bluetooth) {
+            log("錯誤：找不到藍牙 API (請用 Bluefy)");
+            return;
+        }
 
         try {
-            // 使用最穩定的掃描參數
+            log("呼叫 requestDevice...");
+            
+            // 請求裝置 (使用 acceptAllDevices + 完整 UUID)
             const device = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
-                optionalServices: [FTMS_UUID] 
+                optionalServices: [FTMS_UUID] // 這裡傳入的是長字串
             });
+
+            log(`選取裝置: ${device.name}`);
+            log("正在連線 GATT...");
             
-            await connectWithRetry(device, 3);
+            const server = await device.gatt.connect();
+            log("GATT 連線成功！");
+
+            log("取得服務 (Service)...");
+            const service = await server.getPrimaryService(FTMS_UUID);
+            
+            log("取得特徵值 (Characteristics)...");
+            controlChar = await service.getCharacteristic(CTRL_UUID);
+            const dataChar = await service.getCharacteristic(DATA_UUID);
+            
+            log("啟動通知 (Notifications)...");
+            await dataChar.startNotifications();
+            dataChar.addEventListener('characteristicvaluechanged', parseData);
+
+            // 解鎖飛輪
+            log("發送解鎖指令...");
+            await sendHex(0x00);
+            await sendHex(0x07);
+
+            log(">>> 連線完成！ <<<");
+            document.getElementById('mainBtn').innerText = "已連線";
+            document.getElementById('mainBtn').style.background = "#10b981";
+
+            // 心跳包
+            setInterval(() => sendHex(0x07), 30000);
 
         } catch (e) {
-            let errorMsg = typeof e === 'string' ? e : (e.message || JSON.stringify(e));
-            if(errorMsg.includes("cancelled")) {
-                ui.connStatus.innerText = "使用者取消";
-            } else {
-                alert("錯誤: " + errorMsg);
-                ui.connStatus.innerText = "連線失敗: " + errorMsg;
+            log("失敗: " + e);
+            // 如果是物件，嘗試印出內容
+            if (typeof e === 'object') log(JSON.stringify(e));
+        }
+    });
+
+    // 數據解析
+    function parseData(event) {
+        const val = event.target.value;
+        const flags = val.getUint16(0, true);
+        let offset = 2;
+
+        // Speed (Bit 0)
+        if ((flags & 0x01) === 0) offset += 2;
+        // Avg Speed (Bit 1)
+        if (flags & 0x02) offset += 2;
+        // Cadence (Bit 2)
+        if (flags & 0x04) {
+            const rpm = val.getUint16(offset, true) * 0.5;
+            rpmDisp.innerText = Math.floor(rpm);
+            offset += 2;
+        }
+        // Skip others to find Resistance
+        if (flags & 0x08) offset += 2;
+        if (flags & 0x10) offset += 3;
+        
+        // Resistance (Bit 5)
+        if (flags & 0x20) {
+            const r = val.getInt16(offset, true);
+            if (r > 0) {
+                currentRes = r;
+                resDisp.innerText = r;
             }
-            ui.connectBtn.innerText = "掃描並連線";
-        }
-    };
-
-    async function connectWithRetry(device, retries) {
-        for (let i = 0; i < retries; i++) {
-            try {
-                ui.connStatus.innerText = `連線中... (${i + 1})`;
-                debug(`Connect attempt ${i+1}`);
-                await connectDevice(device);
-                return; 
-            } catch (error) {
-                console.error(error);
-                if (i === retries - 1) throw error; 
-                await new Promise(r => setTimeout(r, 1000));
-            }
         }
     }
 
-    async function connectDevice(device) {
-        device.addEventListener('gattserverdisconnected', onDisconnect);
-        const server = await device.gatt.connect();
+    // 阻力控制
+    async function setRes(delta) {
+        if (!controlChar) {
+            log("尚未連線");
+            return;
+        }
+        currentRes += delta;
+        if (currentRes < 1) currentRes = 1;
+        if (currentRes > 32) currentRes = 32;
+        resDisp.innerText = currentRes;
+
+        const target = currentRes * 10;
+        const buffer = new ArrayBuffer(3);
+        const view = new DataView(buffer);
+        view.setUint8(0, 0x04);
+        view.setUint16(1, target, true); // Little Endian
         
-        ui.connStatus.innerText = "取得服務...";
-        const service = await server.getPrimaryService(FTMS_UUID); 
-        
-        controlChar = await service.getCharacteristic(CTRL_UUID); 
-        const dataChar = await service.getCharacteristic(DATA_UUID); 
-        await dataChar.startNotifications();
-        dataChar.addEventListener('characteristicvaluechanged', parseData);
-
-        await sendHex(0x00); 
-        await sendHex(0x07); 
-        
-        ui.overlay.style.display = 'none';
-        ui.btIcon.classList.add('connected');
-        debug("Connected!");
+        log(`設定阻力: ${currentRes}`);
+        await controlChar.writeValue(buffer).catch(e => log("寫入錯誤:"+e));
     }
 
-    // --- Workout Logic ---
-
-    window.startWorkoutRoutine = function() {
-        if (currentStatus !== 'IDLE') return;
-        sendHex(0x07).then(() => {
-            startPhase('WARMUP');
-        });
-    };
-
-    window.stopWorkout = function() {
-        clearInterval(workoutInterval);
-        clearInterval(keeperInterval);
-        currentStatus = 'IDLE';
-        ui.startBtn.innerText = "START WORKOUT";
-        ui.startBtn.disabled = false;
-        ui.startBtn.style.opacity = 1;
-        document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
-        resetTimers();
-        setResistance(1); 
-        debug("Stopped");
-    };
-
-    function startPhase(phaseName) {
-        clearInterval(workoutInterval);
-        clearInterval(keeperInterval);
-        
-        currentStatus = phaseName;
-        debug(`Phase: ${phaseName}`);
-        
-        document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
-        let pKey = phaseName.toLowerCase();
-        let pData = phases[pKey];
-
-        if (phaseName === 'WARMUP') {
-            updateTotalLabel();
-            totalSecondsRemaining = (phases.warmup.mins + phases.workout.mins + phases.cooldown.mins) * 60;
-            ui.startBtn.innerText = "RUNNING...";
-            ui.startBtn.disabled = true;
-            ui.startBtn.style.opacity = 0.5;
-        }
-
-        document.getElementById(`card_${pKey}`).classList.add('active');
-
-        // Command logic: Send twice
-        setResistance(pData.res);
-        setTimeout(() => setResistance(pData.res), 800);
-
-        // Keeper Logic
-        keeperInterval = setInterval(() => {
-            if (currentStatus === phaseName) {
-                setResistanceInternal(phases[pKey].res);
-            }
-        }, 3000);
-
-        workoutInterval = setInterval(() => tick(pKey), 1000);
+    async function sendHex(byte) {
+        if(controlChar) await controlChar.writeValue(new Uint8Array([byte])).catch(()=>{});
     }
 
-    function tick(phaseKey) {
-        if (phases[phaseKey].remainingSecs > 0) {
-            phases[phaseKey].remainingSecs--;
-            document.getElementById(`timer_${phaseKey}`).innerText = formatTime(phases[phaseKey].remainingSecs);
-        }
-
-        if (totalSecondsRemaining > 0) {
-            totalSecondsRemaining--;
-            ui.globalTimer.innerText = formatTime(totalSecondsRemaining);
-        }
-
-        if (phases[phaseKey].remainingSecs <= 0) {
-            nextPhase(phaseKey);
-        }
-    }
-
-    function nextPhase(current) {
-        if (current === 'warmup') startPhase('WORKOUT');
-        else if (current === 'workout') startPhase('COOLDOWN');
-        else if (current === 'cooldown') finishWorkout();
-    }
-
-    function finishWorkout() {
-        clearInterval(workoutInterval);
-        clearInterval(keeperInterval);
-        currentStatus = 'FINISHED';
-        ui.globalTimer.innerText = "DONE!";
-        ui.startBtn.innerText = "FINISHED";
-        setResistance(1); 
-        alert("訓練完成！");
-        setTimeout(stopWorkout, 3000);
-    }
-
-    window.adjTime = function(phase, delta) {
-        let p = phases[phase];
-        p.mins += delta;
-        if (p.mins < 1) p.mins = 1;
-        document.getElementById(`val_time_${phase}`).innerText = p.mins;
-        if (currentStatus === 'IDLE') {
-            p.remainingSecs = p.mins * 60;
-            document.getElementById(`timer_${phase}`).innerText = formatTime(p.remainingSecs);
-            updateTotalLabel();
-        }
-    };
-
-    window.adjRes = function(phase, delta) {
-        let p = phases[phase];
-        p.res += delta;
-        if (p.res < 1) p.res = 1;
-        if (p.res > 32) p.res = 32;
-        document.getElementById(`val_res_${phase}`).innerText = p.res;
-        if (currentStatus
+</script>
+</body>
+</html>
