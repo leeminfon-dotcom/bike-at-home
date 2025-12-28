@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Horizon Interval Trainer V7</title>
+    <style>
+        :root {
+            --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6;
+            --active-border: #3b82f6; --inactive-border: #334155;
+            --text: #f8fafc; --text-muted: #94a3b8;
+            --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg); color: var(--text);
+            margin: 0; padding: 15px;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; touch-action: manipulation;
+        }
+
+        .header { width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .bt-icon { width: 24px; height: 24px; fill: #64748b; transition: 0.3s; }
+        .bt-icon.connected { fill: var(--primary); filter: drop-shadow(0 0 5px var(--primary)); }
+
+        .dashboard {
+            display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;
+            width: 100%; max-width: 500px; margin-bottom: 20px;
+        }
+        .mini-card { background: var(--surface); padding: 10px 5px; border-radius: 12px; text-align: center; }
+        .mini-val { font-size: 24px; font-weight: 800; line-height: 1; }
+        .mini-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
+        .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
+
+        .global-timer-box {
+            width: 100%; max-width: 500px; background: #000; border-radius: 16px;
+            padding: 15px; margin-bottom: 20px; text-align: center; border: 1px solid #333;
+            box-sizing: border-box;
+        }
+        .total-time-display { font-size: 48px; font-weight: bold; font-family: monospace; color: white; letter-spacing: 2px; }
+        .total-label { color: #666; font-size: 12px; margin-top: 5px; }
+
+        .phase-container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+        .phase-card {
+            background: var(--surface); border: 2px solid var(--inactive-border);
+            border-radius: 16px; padding: 15px; transition: 0.3s;
+            display: flex; flex-direction: column; gap: 10px;
+            position: relative; overflow: hidden;
+        }
+        .phase-card.active { border-color: var(--primary); background: #172033; box-shadow: 0 0 15px rgba(59,130,246,0.2); }
+        .phase-title { font-weight: bold; color: var(--text-muted); font-size: 14px; letter-spacing: 1px; display: flex; justify-content: space-between; }
+        .phase-card.active .phase-title { color: var(--primary); }
+
+        .controls-row { display: flex; justify-content: space-between; align-items: center; }
+        .control-group { display: flex; align-items: center; gap: 8px; background: #0f172a; padding: 5px 10px; border-radius: 8px; }
+        .ctrl-btn {
+            width: 30px; height: 30px; border-radius: 50%; border: none;
+            background: #334155; color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .ctrl-btn:active { background: var(--primary); }
+        .ctrl-val { font-size: 18px; font-weight: bold; width: 25px; text-align: center; font-variant-numeric: tabular-nums; }
+        .ctrl-label { font-size: 10px; color: #666; margin-right: 5px; }
+
+        .phase-timer { font-size: 24px; font-family: monospace; font-weight: bold; color: #fff; }
+        .phase-card.active .phase-timer { color: var(--primary); }
+
+        .action-area { width: 100%; max-width: 500px; display: grid; grid-template-columns: 3fr 1fr; gap: 10px; }
+        .main-btn {
+            padding: 15px; font-size: 18px; font-weight: bold; border-radius: 12px; border: none; cursor: pointer; color: white;
+        }
+        #startBtn { background: var(--primary); }
+        #stopBtn { background: #ef4444; }
+        
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.98); z-index: 999;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .connect-btn { padding: 20px 40px; background: var(--primary); color: white; border: none; border-radius: 50px; font-size: 20px; font-weight: bold; cursor: pointer; }
+        
+        /* Debug info */
+        #debug { position:fixed; bottom:5px; right:5px; font-size:10px; color:#444; }
+    </style>
+</head>
+<body>
+
+    <div id="overlay">
+        <button id="connectBtn" class="connect-btn">連線 3.0SC</button>
+        <p style="color:#64748b; margin-top:20px;">點擊以啟動藍牙</p>
+    </div>
+
+    <div class="header">
+        <span style="font-weight:bold; color:#64748b;">HORIZON V7 (STABLE)</span>
+        <svg id="btIcon" class="bt-icon" viewBox="0 0 24 24"><path d="M17.71,7.71L12,2h-1v7.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L11,14.41V22h1l5.71-5.71L13.41,12L17.71,7.71z M13,5.83 l1.88,1.88L13,9.59V5.83z M13,18.17v-3.76l1.88,1.88L13,18.17z"/></svg>
+    </div>
+
+    <div class="dashboard">
+        <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
+        <div class="mini-card"><div id="pwrVal" class="mini-val c-pwr">0</div><div class="mini-lbl">WATT</div></div>
+        <div class="mini-card"><div id="spdVal" class="mini-val c-spd">0.0</div><div class="mini-lbl">KMH</div></div>
+        <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LVL</div></div>
+    </div>
+
+    <div class="global-timer-box">
+        <div id="globalTimer" class="total-time-display">00:00</div>
+        <div id="totalLabel" class="total-label">總時長: -- 分鐘</div>
+    </div>
+
+    <div class="phase-container">
+        <div id="card_warmup" class="phase-card">
+            <div class="phase-title"><span>WARM UP</span><span id="timer_warmup" class="phase-timer">03:00</span></div>
+            <div class="controls-row">
+                <div class="control-group">
+                    <span class="ctrl-label">TIME</span>
+                    <button class="ctrl-btn" onclick="adjTime('warmup', -1)">-</button>
+                    <span id="val_time_warmup" class="ctrl-val">3</span>
+                    <button class="ctrl-btn" onclick="adjTime('warmup', 1)">+</button>
+                </div>
+                <div class="control-group">
+                    <span class="ctrl-label">RES</span>
+                    <button class="ctrl-btn" onclick="adjRes('warmup', -1)">-</button>
+                    <span id="val_res_warmup" class="ctrl-val" style="color:var(--c-res)">10</span>
+                    <button class="ctrl-btn" onclick="adjRes('warmup', 1)">+</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="card_workout" class="phase-card">
+            <div class="phase-title"><span>WORKOUT</span><span id="timer_workout" class="phase-timer">15:00</span></div>
+            <div class="controls-row">
+                <div class="control-group">
+                    <span class="ctrl-label">TIME</span>
+                    <button class="ctrl-btn" onclick="adjTime('workout', -1)">-</button>
+                    <span id="val_time_workout" class="ctrl-val">15</span>
+                    <button class="ctrl-btn" onclick="adjTime('workout', 1)">+</button>
+                </div>
+                <div class="control-group">
+                    <span class="ctrl-label">RES</span>
+                    <button class="ctrl-btn" onclick="adjRes('workout', -1)">-</button>
+                    <span id="val_res_workout" class="ctrl-val" style="color:var(--c-res)">24</span>
+                    <button class="ctrl-btn" onclick="adjRes('workout', 1)">+</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="card_cooldown" class="phase-card">
+            <div class="phase-title"><span>COOL DOWN</span><span id="timer_cooldown" class="phase-timer">03:00</span></div>
+            <div class="controls-row">
+                <div class="control-group">
+                    <span class="ctrl-label">TIME</span>
+                    <button class="ctrl-btn" onclick="adjTime('cooldown', -1)">-</button>
+                    <span id="val_time_cooldown" class="ctrl-val">3</span>
+                    <button class="ctrl-btn" onclick="adjTime('cooldown', 1)">+</button>
+                </div>
+                <div class="control-group">
+                    <span class="ctrl-label">RES</span>
+                    <button class="ctrl-btn" onclick="adjRes('cooldown', -1)">-</button>
+                    <span id="val_res_cooldown" class="ctrl-val" style="color:var(--c-res)">10</span>
+                    <button class="ctrl-btn" onclick="adjRes('cooldown', 1)">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-area">
+        <button id="startBtn" class="main-btn">START WORKOUT</button>
+        <button id="stopBtn" class="main-btn">STOP</button>
+    </div>
+    
+    <div id="debug"></div>
+
+<script>
+    const DEVICE_NAME = "3.0SC"; 
+    const FTMS_UUID = 0x1826;
+    const DATA_UUID = 0x2AD2;
+    const CTRL_UUID = 0x2AD9;
+
+    let controlChar;
+    
+    // 狀態變數
+    const phases = {
+        warmup: { mins: 3, res: 10, remainingSecs: 180 },
+        workout: { mins: 15, res: 24, remainingSecs: 900 },
+        cooldown: { mins: 3, res: 10, remainingSecs: 180 }
+    };
+    
+    let currentStatus = 'IDLE'; 
+    let workoutInterval = null;
+    let keeperInterval = null; // 負責重複發送阻力指令
+    let totalSecondsRemaining = 0;
+    
+    // UI 防止跳動機制
+    let lastCmdTime = 0; 
+
+    const ui = {
+        overlay: document.getElementById('overlay'),
+        connectBtn: document.getElementById('connectBtn'),
+        btIcon: document.getElementById('btIcon'),
+        startBtn: document.getElementById('startBtn'),
+        stopBtn: document.getElementById('stopBtn'),
+        globalTimer: document.getElementById('globalTimer'),
+        totalLabel: document.getElementById('totalLabel'),
+        rpm: document.getElementById('rpmVal'),
+        pwr: document.getElementById('pwrVal'),
+        spd: document.getElementById('spdVal'),
+        res: document.getElementById('resVal')
+    };
+
+    updateTotalLabel();
+
+    // ----------------------------------------------------
+    // 1. 核心邏輯
+    // ----------------------------------------------------
+
+    ui.startBtn.onclick = () => {
+        if (currentStatus !== 'IDLE') return;
+        
+        // 確保先發送一次 START 訊號，喚醒飛輪
+        sendHex(0x07).then(() => {
+            startPhase('WARMUP');
+        });
+    };
+
+    ui.stopBtn.onclick = stopWorkout;
+
+    function startPhase(phaseName) {
+        clearInterval(workoutInterval);
+        clearInterval(keeperInterval); // 清除舊的守護者
+        
+        currentStatus = phaseName;
+        
+        // UI 設定
+        document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
+        let pKey = phaseName.toLowerCase();
+        let pData = phases[pKey];
+
+        // 第一次開始時計算總時間
+        if (phaseName === 'WARMUP') {
+            updateTotalLabel();
+            totalSecondsRemaining = (phases.warmup.mins + phases.workout.mins + phases.cooldown.mins) * 60;
+            ui.startBtn.innerText = "RUNNING...";
+            ui.startBtn.disabled = true;
+            ui.startBtn.style.opacity = 0.5;
+        }
+
+        document.getElementById(`card_${pKey}`).classList.add('active');
+
+        // *** 關鍵修正 1：連續發送兩次指令 ***
+        setResistance(pData.res);
+        setTimeout(() => setResistance(pData.res), 500); // 0.5秒後再發一次，確保收到
+
+        // *** 關鍵修正 2：阻力守護者 (Resistance Keeper) ***
+        // 每 3 秒鐘檢查並補發一次阻力，防止飛輪跳回 1
+        keeperInterval = setInterval(() => {
+            if (currentStatus === phaseName) {
+                // 為了不干擾傳輸，只有當狀態還是該階段時才補發
+                // 使用 quiet=true 模式，不更新 UI，只送指令
+                setResistanceInternal(phases[pKey].res);
+            }
+        }, 3000);
+
+        // 啟動計時
+        workoutInterval = setInterval(() => tick(pKey), 1000);
+    }
+
+    function tick(phaseKey) {
+        if (phases[phaseKey].remainingSecs > 0) {
+            phases[phaseKey].remainingSecs--;
+            document.getElementById(`timer_${phaseKey}`).innerText = formatTime(phases[phaseKey].remainingSecs);
+        }
+
+        if (totalSecondsRemaining > 0) {
+            totalSecondsRemaining--;
+            ui.globalTimer.innerText = formatTime(totalSecondsRemaining);
+        }
+
+        if (phases[phaseKey].remainingSecs <= 0) {
+            nextPhase(phaseKey);
+        }
+    }
+
+    function nextPhase(current) {
+        if (current === 'warmup') startPhase('WORKOUT');
+        else if (current === 'workout') startPhase('COOLDOWN');
+        else if (current === 'cooldown') finishWorkout();
+    }
+
+    function stopWorkout() {
+        clearInterval(workoutInterval);
+        clearInterval(keeperInterval);
+        currentStatus = 'IDLE';
+        ui.startBtn.innerText = "START WORKOUT";
+        ui.startBtn.disabled = false;
+        ui.startBtn.style.opacity = 1;
+        document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
+        
+        resetTimers();
+        setResistance(1); // 歸零
+    }
+
+    function finishWorkout() {
+        clearInterval(workoutInterval);
+        clearInterval(keeperInterval);
+        currentStatus = 'FINISHED';
+        ui.globalTimer.innerText = "DONE!";
+        ui.startBtn.innerText = "FINISHED";
+        setResistance(1); 
+        alert("訓練完成！");
+        setTimeout(stopWorkout, 3000);
+    }
+
+    // ----------------------------------------------------
+    // 2. 調整功能 (+/-)
+    // ----------------------------------------------------
+
+    window.adjTime = function(phase, delta) {
+        let p = phases[phase];
+        p.mins += delta;
+        if (p.mins < 1) p.mins = 1;
+        
+        document.getElementById(`val_time_${phase}`).innerText = p.mins;
+        
+        if (currentStatus === 'IDLE') {
+            p.remainingSecs = p.mins * 60;
+            document.getElementById(`timer_${phase}`).innerText = formatTime(p.remainingSecs);
+            updateTotalLabel();
+        }
+    };
+
+    window.adjRes = function(phase, delta) {
+        let p = phases[phase];
+        p.res += delta;
+        if (p.res < 1) p.res = 1;
+        if (p.res > 32) p.res = 32;
+        
+        document.getElementById(`val_res_${phase}`).innerText = p.res;
+
+        // 如果正在此階段，立即改變阻力
+        if (currentStatus === phase.toUpperCase()) {
+            setResistance(p.res);
+        }
+    };
+
+    function resetTimers() {
+        for (let key in phases) {
+            let p = phases[key];
+            p.remainingSecs = p.mins * 60;
+            document.getElementById(`timer_${key}`).innerText = formatTime(p.remainingSecs);
+        }
+        updateTotalLabel();
+        ui.globalTimer.innerText = "00:00";
+    }
+
+    function updateTotalLabel() {
+        let total = phases.warmup.mins + phases.workout.mins + phases.cooldown.mins;
+        ui.totalLabel.innerText = `總時長: ${total} 分鐘`;
+    }
+
+    function formatTime(sec) {
+        let m = Math.floor(sec / 60);
+        let s = sec % 60;
+        return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+    }
+
+    // ----------------------------------------------------
+    // 3. 藍牙通訊 (Bluetooth)
+    // ----------------------------------------------------
+
+    ui.connectBtn.onclick = async () => {
+        ui.connectBtn.innerText = "搜尋中...";
+        try {
+            let device;
+            try {
+                const known = await navigator.bluetooth.getDevices();
+                device = known.find(d => d.name === DEVICE_NAME);
+            } catch(e){}
+
+            if (!device) {
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: DEVICE_NAME }],
+                    optionalServices: [FTMS_UUID]
+                });
+            }
+            await connectDevice(device);
+        } catch (e) {
+            alert("連線失敗: " + e.message);
+            ui.connectBtn.innerText = "連線 3.0SC";
+        }
+    };
+
+    async function connectDevice(device) {
+        device.addEventListener('gattserverdisconnected', onDisconnect);
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(FTMS_UUID);
+        
+        controlChar = await service.getCharacteristic(CTRL_UUID);
+        const dataChar = await service.getCharacteristic(DATA_UUID);
+        await dataChar.startNotifications();
+        dataChar.addEventListener('characteristicvaluechanged', parseData);
+
+        await sendHex(0x00); // Request Control
+        await sendHex(0x07); // Start Session
+        
+        ui.overlay.style.display = 'none';
+        ui.btIcon.classList.add('connected');
+    }
+
+    // 對外公開的設定阻力函式 (包含 UI 更新)
+    async function setResistance(val) {
+        val = parseInt(val);
+        // 鎖定 UI: 3000ms 內不要接受飛輪回傳的舊數據 (防止跳動)
+        lastCmdTime = Date.now(); 
+        ui.res.innerText = val; 
+        
+        await setResistanceInternal(val);
+    }
+
+    // 內部發送指令 (不更新 UI)
+    async function setResistanceInternal(val) {
+        if (!controlChar) return;
+        const target = val * 10;
+        const buffer = new ArrayBuffer(3);
+        const view = new DataView(buffer);
+        view.setUint8(0, 0x04);
+        view.setUint16(1, target, true);
+        
+        try {
+            await controlChar.writeValue(buffer);
+        } catch(e) { console.log(e); }
+    }
+
+    function parseData(event) {
+        const val = event.target.value;
+        const flags = val.getUint16(0, true);
+        let offset = 2;
+
+        if ((flags & 0x01) === 0) { // Speed
+            ui.spd.innerText = (val.getUint16(offset, true) * 0.01).toFixed(1);
+            offset += 2;
+        }
+        if (flags & 0x02) offset += 2;
+        if (flags & 0x04) { // Cadence
+            ui.rpm.innerText = Math.floor(val.getUint16(offset, true) * 0.5);
+            offset += 2;
+        }
+        if (flags & 0x08) offset += 2;
+        if (flags & 0x10) offset += 3;
+        
+        // Resistance (Bit 5)
+        if (flags & 0x20) { 
+            const r = val.getInt16(offset, true);
+            // *** 關鍵修正 3：防止 UI 跳動 ***
+            // 如果我們在 3 秒內剛發送過指令，就忽略飛輪回傳的舊數據
+            if (r > 0) {
+                if (Date.now() - lastCmdTime > 3000) {
+                    ui.res.innerText = r;
+                }
+            }
+            offset += 2;
+        }
+        
+        if (flags & 0x40) { // Power
+            ui.pwr.innerText = val.getInt16(offset, true);
+            offset += 2;
+        }
+    }
+
+    async function sendHex(byte) {
+        if(controlChar) await controlChar.writeValue(new Uint8Array([byte])).catch(()=>{});
+    }
+
+    function onDisconnect() {
+        ui.btIcon.classList.remove('connected');
+        stopWorkout();
+        alert("已斷線");
+        location.reload();
+    }
+</script>
+</body>
+</html>
