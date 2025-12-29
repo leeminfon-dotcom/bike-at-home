@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V26 (Auto-Device)</title>
+    <title>Horizon V27 (Safe Bind)</title>
     <style>
         :root {
             --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6;
@@ -46,7 +46,13 @@
         }
         #startBtn { background: #10b981; }
         #stopBtn { background: #ef4444; }
-        #connectBtn { background: var(--primary); width: 100%; max-width: 500px; margin-bottom: 10px; font-size: 18px; padding: 15px; border-radius: 12px; border:none; color:white; font-weight:bold; cursor: pointer; }
+        
+        /* Connect Button */
+        #connectBtn { 
+            background: var(--primary); width: 100%; max-width: 500px; 
+            margin-bottom: 10px; font-size: 18px; padding: 15px; 
+            border-radius: 12px; border:none; color:white; font-weight:bold; cursor: pointer; 
+        }
 
         /* Dashboard */
         .dashboard {
@@ -108,15 +114,15 @@
     <div id="sys-error"></div>
 
     <div class="header">
-        <span style="font-weight:bold;">HORIZON V26 (Auto-Device)</span>
+        <span style="font-weight:bold;">HORIZON V27 (Safe Bind)</span>
         <span id="btStatus" class="bt-status">Disconnected</span>
     </div>
 
-    <button id="connectBtn" onclick="startScan()">1. Connect Bike</button>
+    <button id="connectBtn">1. Scan & Connect (3.0SC)</button>
 
     <div class="action-area">
-        <button id="startBtn" class="main-btn" onclick="startWorkoutRoutine()">START</button>
-        <button id="stopBtn" class="main-btn" onclick="stopWorkout()">STOP</button>
+        <button id="startBtn" class="main-btn">START</button>
+        <button id="stopBtn" class="main-btn">STOP</button>
     </div>
 
     <div class="dashboard">
@@ -132,7 +138,6 @@
     </div>
 
     <div class="phase-container">
-        
         <div id="card_warmup" class="phase-card">
             <div class="phase-header"><span>WARM UP</span><span id="timer_warmup" class="phase-timer">03:00</span></div>
             <div class="controls-row">
@@ -148,30 +153,7 @@
                 </div>
             </div>
         </div>
-
         <div id="card_workout1" class="phase-card">
             <div class="phase-header"><span>WORKOUT 1</span><span id="timer_workout1" class="phase-timer">15:00</span></div>
             <div class="controls-row">
                 <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjRes('workout1', -1)">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_workout1" class="ctrl-val c-res">24</span></div>
-                    <button class="ctrl-btn" onclick="adjRes('workout1', 1)">+</button>
-                </div>
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjTime('workout1', -1)">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">TIME</span><span id="val_time_workout1" class="ctrl-val">15</span></div>
-                    <button class="ctrl-btn" onclick="adjTime('workout1', 1)">+</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="card_workout2" class="phase-card">
-            <div class="phase-header"><span>WORKOUT 2</span><span id="timer_workout2" class="phase-timer">10:00</span></div>
-            <div class="controls-row">
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjRes('workout2', -1)">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_workout2" class="ctrl-val c-res">20</span></div>
-                    <button class="ctrl-btn" onclick="adjRes('workout2', 1)">+</button>
-                </div>
-                <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjTime('workout2
