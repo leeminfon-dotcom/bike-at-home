@@ -3,122 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V28 (Robust)</title>
+    <title>Horizon V29 (Safety)</title>
     <style>
-        :root {
-            --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6;
-            --text: #f8fafc; --text-muted: #94a3b8;
-            --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899;
-        }
+        :root { --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6; --text: #f8fafc; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: var(--bg); color: var(--text);
-            margin: 0; padding: 15px;
-            display: flex; flex-direction: column; align-items: center;
-            min-height: 100vh; touch-action: manipulation;
-            padding-bottom: 180px; /* Space for Debug Console */
+            font-family: monospace, sans-serif; background: var(--bg); color: var(--text);
+            margin: 0; padding: 10px; display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; padding-bottom: 200px;
         }
 
-        /* 1. Error & Debug */
-        #sys-error {
-            width: 100%; background: #ef4444; color: white; padding: 15px;
-            font-weight: bold; text-align: center; display: none; margin-bottom: 20px;
-            border-radius: 8px; border: 2px solid white;
-        }
+        /* Debug Console */
         #console-log {
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 160px;
-            background: rgba(0,0,0,0.95); color: #0f0; border-top: 2px solid #555;
-            font-size: 11px; padding: 10px; overflow-y: scroll; font-family: monospace;
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 180px;
+            background: #000; color: #0f0; border-top: 2px solid #555;
+            font-size: 11px; padding: 10px; overflow-y: scroll;
             z-index: 9999; box-sizing: border-box; text-align: left;
         }
 
-        /* 2. UI Structure */
-        .header { width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .bt-status { font-size: 12px; color: #64748b; font-weight: bold; }
-        .bt-status.connected { color: var(--primary); }
-
-        /* 3. Top Buttons */
-        .top-controls { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
-        #connectBtn { 
-            background: var(--primary); color: white; border: none; padding: 15px; 
-            font-size: 18px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%;
-        }
-        .action-row { display: flex; gap: 10px; }
-        .main-btn {
-            flex: 1; padding: 20px; border-radius: 12px; border: none; 
-            font-weight: bold; font-size: 20px; color: white; cursor: pointer;
-        }
-        #startBtn { background: #10b981; }
-        #stopBtn { background: #ef4444; }
-
-        /* 4. Dashboard */
-        .dashboard {
-            display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;
-            width: 100%; max-width: 500px; margin-bottom: 15px;
-        }
-        .mini-card { background: var(--surface); padding: 10px 5px; border-radius: 12px; text-align: center; }
-        .mini-val { font-size: 22px; font-weight: 800; line-height: 1; }
-        .mini-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
-        .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
-
-        /* 5. Global Timer */
-        .global-timer-box {
-            width: 100%; max-width: 500px; background: #000; border-radius: 16px;
-            padding: 10px; margin-bottom: 15px; text-align: center; border: 1px solid #333;
-            box-sizing: border-box;
-        }
-        .total-time-display { font-size: 36px; font-weight: bold; font-family: monospace; color: white; letter-spacing: 2px; }
-        .total-label { color: #666; font-size: 12px; margin-top: 2px; }
-
-        /* 6. Phases */
-        .phase-container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
-        .phase-card {
-            background: var(--surface); border: 2px solid #334155;
-            border-radius: 16px; padding: 10px 15px; transition: 0.3s;
-        }
-        .phase-card.active { border-color: var(--primary); background: #17253d; box-shadow: 0 0 15px rgba(59,130,246,0.3); }
+        /* Layout */
+        .header { width: 100%; max-width: 500px; display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 5px; width: 100%; max-width: 500px; margin-bottom: 15px; }
+        .mini-card { background: var(--surface); padding: 10px 5px; border-radius: 8px; text-align: center; }
+        .mini-val { font-size: 20px; font-weight: bold; }
+        .mini-lbl { font-size: 10px; color: #94a3b8; }
         
-        .phase-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 8px; font-size: 14px; color: var(--text-muted); }
-        .phase-card.active .phase-header { color: var(--primary); }
-        .phase-timer { font-family: monospace; font-size: 16px; color: white; }
+        .global-timer { background: #000; width: 100%; max-width: 500px; border-radius: 12px; padding: 10px; text-align: center; border: 1px solid #333; margin-bottom: 15px; }
+        .time-big { font-size: 40px; font-weight: bold; color: white; }
 
-        /* Controls inside cards */
-        .controls-row { display: flex; justify-content: space-between; gap: 10px; }
-        .control-group { 
-            background: rgba(0,0,0,0.3); padding: 8px; border-radius: 10px; flex: 1; 
-            display: flex; justify-content: space-between; align-items: center; 
-        }
-        .ctrl-btn {
-            width: 32px; height: 32px; border-radius: 50%; border: none;
-            background: #475569; color: white; font-size: 20px; cursor: pointer;
-            display: flex; justify-content: center; align-items: center;
-        }
-        .ctrl-btn:active { background: var(--primary); }
-        .col-center { display:flex; flex-direction:column; align-items:center; }
-        .ctrl-val { font-size: 20px; font-weight: 800; min-width: 30px; text-align: center; }
-        .ctrl-lbl { font-size: 9px; color: #aaa; margin-bottom: 2px; }
-
+        /* Phases */
+        .phase-box { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .p-card { background: var(--surface); border: 1px solid #334155; padding: 10px; border-radius: 10px; }
+        .p-card.active { border: 2px solid var(--primary); background: #17253d; }
+        .p-head { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; margin-bottom: 5px; }
+        
+        /* Controls */
+        .ctrl-row { display: flex; justify-content: space-between; gap: 10px; }
+        .ctrl-grp { background: rgba(0,0,0,0.3); padding: 5px; border-radius: 8px; flex: 1; display: flex; justify-content: space-between; align-items: center; }
+        .c-btn { width: 30px; height: 30px; border-radius: 50%; border: none; background: #475569; color: white; font-size: 18px; font-weight: bold; }
+        .c-val { font-size: 18px; font-weight: bold; min-width: 30px; text-align: center; }
+        
+        /* Main Buttons */
+        .top-btns { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+        .row-btns { display: flex; gap: 10px; }
+        .btn-big { flex: 1; padding: 15px; border-radius: 10px; border: none; font-size: 18px; font-weight: bold; color: white; }
+        #btn-scan { background: var(--primary); width: 100%; }
+        #btn-start { background: #10b981; }
+        #btn-stop { background: #ef4444; }
     </style>
 
     <script>
         window.onerror = function(msg, url, line) {
-            var errDiv = document.getElementById('sys-error');
-            if(errDiv) { 
-                errDiv.style.display = 'block'; 
-                errDiv.innerHTML = '⚠️ CRASH: ' + msg + ' (Line ' + line + ')'; 
-            }
             var dbg = document.getElementById('console-log');
-            if(dbg) {
-                dbg.innerHTML += '<div style="color:red">CRASH: ' + msg + '</div>';
-            }
+            if(dbg) dbg.innerHTML += '<div style="color:red">ERROR: ' + msg + ' (Line ' + line + ')</div>';
         };
-        
         function log(msg) {
             var dbg = document.getElementById('console-log');
             if(dbg) {
-                var d = new Date();
-                var ts = d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds();
-                dbg.innerHTML += '<div><span style="color:#666">[' + ts + ']</span> ' + msg + '</div>';
+                var t = new Date().toTimeString().split(' ')[0];
+                dbg.innerHTML += '<div><span style="color:#666">[' + t + ']</span> ' + msg + '</div>';
                 dbg.scrollTop = dbg.scrollHeight;
             }
             console.log(msg);
@@ -127,299 +69,185 @@
 </head>
 <body>
 
-    <div id="sys-error"></div>
-
     <div class="header">
-        <span style="font-weight:bold;">HORIZON V28</span>
-        <span id="btStatus" class="bt-status">Disconnected</span>
+        <strong>HORIZON V29</strong>
+        <span id="status">Disconnected</span>
     </div>
 
-    <div class="top-controls">
-        <button id="connectBtn">1. Connect Bike</button>
-        <div class="action-row">
-            <button id="startBtn" class="main-btn">START</button>
-            <button id="stopBtn" class="main-btn">STOP</button>
+    <div class="top-btns">
+        <button id="btn-scan" class="btn-big">1. Connect Bike</button>
+        <div class="row-btns">
+            <button id="btn-start" class="btn-big">START</button>
+            <button id="btn-stop" class="btn-big">STOP</button>
         </div>
     </div>
 
     <div class="dashboard">
-        <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
-        <div class="mini-card"><div id="pwrVal" class="mini-val c-pwr">0</div><div class="mini-lbl">WATT</div></div>
-        <div class="mini-card"><div id="spdVal" class="mini-val c-spd">0.0</div><div class="mini-lbl">KMH</div></div>
-        <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LEVEL</div></div>
+        <div class="mini-card"><div id="d-rpm" class="mini-val" style="color:#10b981">0</div><div class="mini-lbl">RPM</div></div>
+        <div class="mini-card"><div id="d-watt" class="mini-val" style="color:#f59e0b">0</div><div class="mini-lbl">WATT</div></div>
+        <div class="mini-card"><div id="d-spd" class="mini-val" style="color:#06b6d4">0.0</div><div class="mini-lbl">KMH</div></div>
+        <div class="mini-card"><div id="d-lvl" class="mini-val" style="color:#ec4899">1</div><div class="mini-lbl">LEVEL</div></div>
     </div>
 
-    <div class="global-timer-box">
-        <div id="globalTimer" class="total-time-display">00:00</div>
-        <div id="totalLabel" class="total-label">Total Time</div>
+    <div class="global-timer">
+        <div id="g-time" class="time-big">00:00</div>
+        <div id="g-label" style="font-size:12px; color:#888;">Total Time</div>
     </div>
 
-    <div class="phase-container">
-        
-        <div id="card_warmup" class="phase-card">
-            <div class="phase-header"><span>WARM UP</span><span id="timer_warmup" class="phase-timer">03:00</span></div>
-            <div class="controls-row">
-                <div class="control-group">
-                    <button class="ctrl-btn" id="btn_warmup_lvl_down">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_warmup" class="ctrl-val c-res">10</span></div>
-                    <button class="ctrl-btn" id="btn_warmup_lvl_up">+</button>
-                </div>
-                <div class="control-group">
-                    <button class="ctrl-btn" id="btn_warmup_time_down">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">TIME</span><span id="val_time_warmup" class="ctrl-val">3</span></div>
-                    <button class="ctrl-btn" id="btn_warmup_time_up">+</button>
-                </div>
-            </div>
+    <div id="phase-wrapper" class="phase-box">
         </div>
 
-        <div id="card_workout1" class="phase-card">
-            <div class="phase-header"><span>WORKOUT 1</span><span id="timer_workout1" class="phase-timer">15:00</span></div>
-            <div class="controls-row">
-                <div class="control-group">
-                    <button class="ctrl-btn" id="btn_workout1_lvl_down">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_workout1" class="ctrl-val c-res">24</span></div>
-                    <button class="ctrl-btn" id="btn_workout1_lvl_up">+</button>
-                </div>
-                <div class="control-group">
-                    <button class="ctrl-btn" id="btn_workout1_time_down">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">TIME</span><span id="val_time_workout1" class="ctrl-val">15</span></div>
-                    <button class="ctrl-btn" id="btn_workout1_time_up">+</button>
-                </div>
-            </div>
-        </div>
+    <div id="console-log">V29 Booting...</div>
 
-        <div id="card_workout2" class="phase-card">
-            <div class="phase-header"><span>WORKOUT 2</span><span id="timer_workout2" class="phase-timer">10:00</span></div>
-            <div class="controls-row">
-                <div class="control-group">
-                    <button class="ctrl-btn" id="btn_workout2_lvl_down">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_workout2" class="ctrl-val c-res">20</span></div>
-                    <button class="ctrl-btn" id="btn_workout2_lvl_up">+</button>
-                </div>
-                <div class="control-group">
-                    <button class="ctrl-btn" id="btn_workout2_time_down">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">TIME</span><span id="val_time_workout2" class="ctrl-val">10</span></div>
-                    <button class="ctrl-btn" id="btn_workout2_time_up">+</button>
-                </div>
-            </div>
-        </div>
+<script>
+    // --- 1. SAFE VARIABLES ---
+    log("1. Init Constants...");
+    var FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
+    var DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
+    var CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
+    
+    var controlChar = null;
+    var currentStatus = 'IDLE'; 
+    var intervals = { work: null, keep: null };
+    
+    // Default Data
+    var phaseData = {
+        'p1': { name: 'WARM UP',   mins: 3,  lvl: 10, sec: 180 },
+        'p2': { name: 'WORKOUT 1', mins: 15, lvl: 24, sec: 900 },
+        'p3': { name: 'WORKOUT 2', mins: 10, lvl: 20, sec: 600 },
+        'p4': { name: 'COOL DOWN', mins: 3,  lvl: 10, sec: 180 }
+    };
+    var phaseOrder = ['p1', 'p2', 'p3', 'p4'];
 
-        <div id="card_cooldown" class="phase-card">
-            <div class="phase-header"><span>COOL DOWN</span><span id="timer_cooldown" class="phase-timer">03:00</span></div>
-            <div class="controls-row">
-                <div class="control-group">
-                    <button class="ctrl-btn" id="btn_cooldown_lvl_down">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_cooldown" class="ctrl-val c-res">10</span></div>
-                    <button class="ctrl-btn" id="btn_cooldown_lvl_up">+</button>
-                </div>
-                <div class="control-group">
-                    <button class="ctrl-btn" id="btn_cooldown_time_down">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">TIME</span><span id="val_time_cooldown" class="ctrl-val">3</span></div>
-                    <button class="ctrl-btn" id="btn_cooldown_time_up">+</button>
-                </div>
-            </div>
-        </div>
+    // --- 2. HTML GENERATOR (To ensure IDs exist) ---
+    log("2. Generating UI...");
+    var wrapper = document.getElementById('phase-wrapper');
+    if(!wrapper) log("ERROR: Wrapper not found");
+    
+    phaseOrder.forEach(function(key) {
+        var p = phaseData[key];
+        var html = 
+        '<div id="card_'+key+'" class="p-card">' +
+            '<div class="p-head"><span>'+p.name+'</span><span id="t_'+key+'">00:00</span></div>' +
+            '<div class="ctrl-row">' +
+                '<div class="ctrl-grp">' +
+                    '<button class="c-btn" onclick="userAdj(\''+key+'\', \'lvl\', -1)">-</button>' +
+                    '<div style="text-align:center"><div style="font-size:10px;color:#aaa">LEVEL</div><span id="v_lvl_'+key+'" class="c-val">'+p.lvl+'</span></div>' +
+                    '<button class="c-btn" onclick="userAdj(\''+key+'\', \'lvl\', 1)">+</button>' +
+                '</div>' +
+                '<div class="ctrl-grp">' +
+                    '<button class="c-btn" onclick="userAdj(\''+key+'\', \'min\', -1)">-</button>' +
+                    '<div style="text-align:center"><div style="font-size:10px;color:#aaa">TIME</div><span id="v_min_'+key+'" class="c-val">'+p.mins+'</span></div>' +
+                    '<button class="c-btn" onclick="userAdj(\''+key+'\', \'min\', 1)">+</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+        wrapper.innerHTML += html;
+    });
 
-    </div>
-
-    <div id="console-log">V28 Initializing...</div>
-
-    <script>
-        // --- 1. GLOBAL VARIABLES ---
-        var FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
-        var DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
-        var CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
-        var DEVICE_ID_KEY = 'horizon_last_device_id';
-        var CONFIG_KEY = 'horizon_config_v28';
-
-        var controlChar = null;
-        var currentStatus = 'IDLE'; 
-        var workoutInterval = null;
-        var keeperInterval = null; 
-        var lastCmdTime = 0;
-
-        // Data Model
-        var phases = {
-            warmup:   { mins: 3,  res: 10, remainingSecs: 180 },
-            workout1: { mins: 15, res: 24, remainingSecs: 900 },
-            workout2: { mins: 10, res: 20, remainingSecs: 600 },
-            cooldown: { mins: 3,  res: 10, remainingSecs: 180 }
-        };
-
-        // --- 2. INITIALIZATION (Window Load) ---
-        window.onload = function() {
-            log("Window Loaded. System Starting.");
-            
-            // Bind Top Buttons
-            bindClick('connectBtn', startScan);
-            bindClick('startBtn', startWorkoutRoutine);
-            bindClick('stopBtn', stopWorkout);
-
-            // Bind Control Buttons (Manually to be safe)
-            bindPhaseControls('warmup');
-            bindPhaseControls('workout1');
-            bindPhaseControls('workout2');
-            bindPhaseControls('cooldown');
-
-            // Load Settings
-            loadSettings();
-            
-            // Check Last Device
-            var lastId = localStorage.getItem(DEVICE_ID_KEY);
-            if(lastId) {
-                log("Saved Device ID found: " + lastId);
-                var btn = document.getElementById('connectBtn');
-                if(btn) btn.innerText = "1. Connect (Auto)";
-            }
-        };
-
-        function bindClick(id, func) {
-            var el = document.getElementById(id);
-            if(el) el.addEventListener('click', func);
-            else log("Error: Element " + id + " not found.");
-        }
-
-        function bindPhaseControls(phase) {
-            bindClick('btn_' + phase + '_lvl_down', function() { adjRes(phase, -1); });
-            bindClick('btn_' + phase + '_lvl_up',   function() { adjRes(phase, 1); });
-            bindClick('btn_' + phase + '_time_down', function() { adjTime(phase, -1); });
-            bindClick('btn_' + phase + '_time_up',   function() { adjTime(phase, 1); });
-        }
-
-        // --- 3. BLUETOOTH LOGIC ---
-        
-        async function startScan() {
-            log(">>> Connect Button Clicked");
-            
-            if (!navigator.bluetooth) {
-                alert("Web Bluetooth not supported.");
-                return;
-            }
-
-            var btn = document.getElementById('connectBtn');
-            btn.innerText = "Connecting...";
-
-            try {
-                var device;
-                
-                // 1. Try Auto Connect (if supported)
-                try {
-                    if (typeof navigator.bluetooth.getDevices === 'function') {
-                        var lastId = localStorage.getItem(DEVICE_ID_KEY);
-                        if(lastId) {
-                            var knowns = await navigator.bluetooth.getDevices();
-                            var match = knowns.find(d => d.id === lastId);
-                            if(match) {
-                                log("Auto-matching device: " + match.name);
-                                device = match;
-                            }
-                        }
-                    }
-                } catch(e) { log("Auto-connect check skipped."); }
-
-                // 2. Fallback to Scanner (acceptAllDevices)
-                if (!device) {
-                    log("Launching Scanner (Full UUID)...");
-                    device = await navigator.bluetooth.requestDevice({
-                        acceptAllDevices: true,
-                        optionalServices: [FTMS_UUID] 
-                    });
+    // --- 3. STORAGE (SAFE MODE) ---
+    log("3. Loading Memory...");
+    try {
+        var saved = localStorage.getItem('horizon_v29_data');
+        if(saved) {
+            var parsed = JSON.parse(saved);
+            for(var k in parsed) {
+                if(phaseData[k]) {
+                    phaseData[k].mins = parsed[k].mins;
+                    phaseData[k].lvl = parsed[k].lvl;
+                    phaseData[k].sec = parsed[k].mins * 60;
                 }
-
-                // Save ID
-                localStorage.setItem(DEVICE_ID_KEY, device.id);
-                
-                await connectDevice(device);
-
-            } catch (e) {
-                log("Scan Failed: " + e);
-                if(String(e).includes("cancelled")) btn.innerText = "1. Connect Bike";
-                else alert("Scan Failed: " + e);
             }
+            log("Memory Loaded.");
         }
+    } catch(e) {
+        log("Memory Error (Private Mode?): " + e.message);
+    }
+    refreshUI();
 
-        async function connectDevice(device) {
+    // --- 4. BINDINGS ---
+    log("4. Binding Buttons...");
+    try {
+        document.getElementById('btn-scan').addEventListener('click', startScan);
+        document.getElementById('btn-start').addEventListener('click', startRoutine);
+        document.getElementById('btn-stop').addEventListener('click', stopAll);
+    } catch(e) {
+        log("Binding Error: " + e.message);
+    }
+
+    log(">>> SYSTEM READY <<<");
+
+    // --- FUNCTIONS ---
+
+    function userAdj(key, type, delta) {
+        var p = phaseData[key];
+        if(type === 'lvl') {
+            p.lvl += delta;
+            if(p.lvl < 1) p.lvl = 1;
+            if(p.lvl > 32) p.lvl = 32;
+            // Immediate update if running
+            if(currentStatus === key) setLevel(p.lvl);
+        } else {
+            p.mins += delta;
+            if(p.mins < 1) p.mins = 1;
+            // Only update timer if not running this phase
+            if(currentStatus === 'IDLE') p.sec = p.mins * 60;
+        }
+        refreshUI();
+    }
+
+    function refreshUI() {
+        var totalMin = 0;
+        phaseOrder.forEach(function(key) {
+            var p = phaseData[key];
+            document.getElementById('v_lvl_'+key).innerText = p.lvl;
+            document.getElementById('v_min_'+key).innerText = p.mins;
+            document.getElementById('t_'+key).innerText = fmt(p.sec);
+            totalMin += p.mins;
+        });
+        document.getElementById('g-label').innerText = "Total: " + totalMin + " Mins";
+        
+        if(currentStatus === 'IDLE') {
+            document.getElementById('g-time').innerText = fmt(totalMin * 60);
+        }
+    }
+
+    function saveMem() {
+        try {
+            var s = {};
+            for(var k in phaseData) s[k] = { mins: phaseData[k].mins, lvl: phaseData[k].lvl };
+            localStorage.setItem('horizon_v29_data', JSON.stringify(s));
+        } catch(e) {}
+    }
+
+    // --- BLUETOOTH ---
+
+    async function startScan() {
+        log("Scan Clicked.");
+        if(!navigator.bluetooth) return alert("No Bluetooth API");
+        
+        var btn = document.getElementById('btn-scan');
+        btn.innerText = "Scanning...";
+
+        try {
+            // Auto Connect Check
             try {
-                log("GATT Connecting...");
-                device.addEventListener('gattserverdisconnected', onDisconnect);
-                var server = await device.gatt.connect();
-                
-                log("Service...");
-                var service = await server.getPrimaryService(FTMS_UUID);
-                
-                log("Characteristics...");
-                controlChar = await service.getCharacteristic(CTRL_UUID);
-                var dataChar = await service.getCharacteristic(DATA_UUID);
-                
-                log("Notify...");
-                await dataChar.startNotifications();
-                dataChar.addEventListener('characteristicvaluechanged', parseData);
+                var lastId = localStorage.getItem('horizon_v29_dev');
+                if(lastId && navigator.bluetooth.getDevices) {
+                    var devs = await navigator.bluetooth.getDevices();
+                    var match = devs.find(function(d) { return d.id === lastId; });
+                    if(match) {
+                        log("Auto-connecting to: " + match.name);
+                        return doConnect(match);
+                    }
+                }
+            } catch(e) {}
 
-                log("Unlocking...");
-                await sendHex(0x00);
-                await sendHex(0x07);
-
-                log(">>> CONNECTED <<<");
-                document.getElementById('btStatus').innerText = "Connected";
-                document.getElementById('btStatus').className = "bt-status connected";
-                document.getElementById('connectBtn').style.display = 'none';
-
-            } catch(e) {
-                log("Conn Error: " + e);
-                alert("Connection Error: " + e);
-                document.getElementById('connectBtn').innerText = "Retry Connection";
-            }
-        }
-
-        // --- 4. WORKOUT LOGIC ---
-
-        function startWorkoutRoutine() {
-            if (currentStatus !== 'IDLE') return;
-            saveSettings(); // Save before start
-            log("Routine Started");
-            sendHex(0x07).then(() => {
-                startPhase('warmup');
+            // Manual Scan
+            log("Opening Scanner...");
+            var dev = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: [FTMS_UUID]
             });
-        }
-
-        function stopWorkout() {
-            clearInterval(workoutInterval);
-            clearInterval(keeperInterval);
-            currentStatus = 'IDLE';
-            
-            // Remove active class
-            var cards = document.querySelectorAll('.phase-card');
-            cards.forEach(c => c.classList.remove('active'));
-
-            resetTimers();
-            updateTotalLabel();
-            setResistance(1);
-            
-            saveSettings(); // Save on stop
-            log("Stopped.");
-        }
-
-        function startPhase(phaseName) {
-            clearInterval(workoutInterval);
-            clearInterval(keeperInterval);
-            
-            currentStatus = phaseName;
-            log(">>> Phase: " + phaseName);
-
-            // Highlight UI
-            var cards = document.querySelectorAll('.phase-card');
-            cards.forEach(c => c.classList.remove('active'));
-            document.getElementById('card_' + phaseName).classList.add('active');
-
-            // Set Resistance
-            var pData = phases[phaseName];
-            setResistance(pData.res);
-            setTimeout(() => setResistance(pData.res), 800); // Double send
-
-            // Keeper (3s)
-            keeperInterval = setInterval(() => {
-                if(currentStatus === phaseName) setResistanceInternal(phases[phaseName].res);
-            }, 3000);
-
-            // Timer (1s)
-            workoutInterval = setInterval(() => tick(phaseName), 1000);
+            try { localStorage.setItem('horizon_v29_dev', dev.id); } catch(e){}
+            doConnect
