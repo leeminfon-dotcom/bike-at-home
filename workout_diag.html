@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V24 (Final Integrated)</title>
+    <title>Horizon V25 (4-Phase Memory)</title>
     <style>
         :root {
             --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6;
@@ -19,27 +19,36 @@
             padding-bottom: 160px; /* Space for Debug Console */
         }
 
-        /* 1. System Error Banner (Top) */
+        /* Error & Debug */
         #sys-error {
             width: 100%; background: #ef4444; color: white; padding: 15px;
             font-weight: bold; text-align: center; display: none; margin-bottom: 20px;
             border-radius: 8px; border: 2px solid white;
         }
-
-        /* 2. Debug Console (Bottom Fixed) */
         #console-log {
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 150px;
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 120px;
             background: rgba(0,0,0,0.9); color: #0f0; border-top: 2px solid #555;
             font-size: 11px; padding: 10px; overflow-y: scroll; font-family: monospace;
             z-index: 9999; box-sizing: border-box;
         }
 
-        /* 3. Header */
-        .header { width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        /* UI Structure */
+        .header { width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .bt-status { font-size: 12px; color: #64748b; font-weight: bold; }
         .bt-status.connected { color: var(--primary); }
 
-        /* 4. Dashboard (Grid) */
+        /* Action Buttons (Moved to Top) */
+        .action-area { width: 100%; max-width: 500px; display: flex; gap: 10px; margin-bottom: 20px; }
+        .main-btn {
+            flex: 1; padding: 15px; border-radius: 12px; border: none; 
+            font-weight: bold; font-size: 18px; color: white; cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        #startBtn { background: #10b981; }
+        #stopBtn { background: #ef4444; }
+        #connectBtn { background: var(--primary); width: 100%; max-width: 500px; margin-bottom: 10px; font-size: 18px; padding: 15px; border-radius: 12px; border:none; color:white; font-weight:bold; cursor: pointer; }
+
+        /* Dashboard */
         .dashboard {
             display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;
             width: 100%; max-width: 500px; margin-bottom: 20px;
@@ -49,22 +58,22 @@
         .mini-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-top: 2px; }
         .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
 
-        /* 5. Global Timer */
+        /* Global Timer */
         .global-timer-box {
             width: 100%; max-width: 500px; background: #000; border-radius: 16px;
-            padding: 15px; margin-bottom: 20px; text-align: center; border: 1px solid #333;
+            padding: 10px; margin-bottom: 20px; text-align: center; border: 1px solid #333;
             box-sizing: border-box;
         }
-        .total-time-display { font-size: 48px; font-weight: bold; font-family: monospace; color: white; letter-spacing: 2px; }
-        .total-label { color: #666; font-size: 12px; margin-top: 5px; }
+        .total-time-display { font-size: 42px; font-weight: bold; font-family: monospace; color: white; letter-spacing: 2px; }
+        .total-label { color: #666; font-size: 12px; margin-top: 2px; }
 
-        /* 6. Phases */
+        /* Phase Cards */
         .phase-container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
         .phase-card {
             background: var(--surface); border: 2px solid #334155;
             border-radius: 16px; padding: 15px; transition: 0.3s;
         }
-        .phase-card.active { border-color: var(--primary); background: #17253d; box-shadow: 0 0 15px rgba(59,130,246,0.2); }
+        .phase-card.active { border-color: var(--primary); background: #17253d; box-shadow: 0 0 15px rgba(59,130,246,0.2); transform: scale(1.02); }
         .phase-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px; font-size: 14px; color: var(--text-muted); }
         .phase-card.active .phase-header { color: var(--primary); }
         .phase-timer { font-family: monospace; font-size: 18px; color: white; }
@@ -83,27 +92,12 @@
         .ctrl-val { font-size: 24px; font-weight: 800; min-width: 40px; text-align: center; }
         .ctrl-lbl { font-size: 10px; color: #aaa; margin-bottom: 5px; display:block; text-align:center;}
         .col-center { display:flex; flex-direction:column; align-items:center; }
-
-        /* 7. Action Buttons */
-        .action-area { width: 100%; max-width: 500px; display: flex; gap: 10px; margin-bottom: 20px; }
-        .main-btn {
-            flex: 1; padding: 15px; border-radius: 12px; border: none; 
-            font-weight: bold; font-size: 16px; color: white; cursor: pointer;
-        }
-        #connectBtn { background: var(--primary); width: 100%; max-width: 500px; margin-bottom: 20px; font-size: 20px; padding: 20px; }
-        #startBtn { background: #10b981; }
-        #stopBtn { background: #ef4444; }
-
     </style>
     
     <script>
         window.onerror = function(msg, url, line) {
             const errDiv = document.getElementById('sys-error');
-            if(errDiv) {
-                errDiv.style.display = 'block';
-                errDiv.innerHTML = `⚠️ SYSTEM CRASH: ${msg} (Line ${line})`;
-            }
-            // Also try to log to debug console
+            if(errDiv) { errDiv.style.display = 'block'; errDiv.innerHTML = `⚠️ CRASH: ${msg} (Line ${line})`; }
             const dbg = document.getElementById('console-log');
             if(dbg) dbg.innerHTML += `<div style="color:red">CRASH: ${msg}</div>`;
         };
@@ -114,17 +108,22 @@
     <div id="sys-error"></div>
 
     <div class="header">
-        <span style="font-weight:bold;">HORIZON V24</span>
+        <span style="font-weight:bold;">HORIZON V25 (4-Phase)</span>
         <span id="btStatus" class="bt-status">Disconnected</span>
     </div>
 
     <button id="connectBtn" onclick="startScan()">1. Scan & Connect (3.0SC)</button>
 
+    <div class="action-area">
+        <button id="startBtn" class="main-btn" onclick="startWorkoutRoutine()">START</button>
+        <button id="stopBtn" class="main-btn" onclick="stopWorkout()">STOP</button>
+    </div>
+
     <div class="dashboard">
         <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
         <div class="mini-card"><div id="pwrVal" class="mini-val c-pwr">0</div><div class="mini-lbl">WATT</div></div>
         <div class="mini-card"><div id="spdVal" class="mini-val c-spd">0.0</div><div class="mini-lbl">KMH</div></div>
-        <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LVL</div></div>
+        <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LEVEL</div></div>
     </div>
 
     <div class="global-timer-box">
@@ -139,7 +138,7 @@
             <div class="controls-row">
                 <div class="control-group">
                     <button class="ctrl-btn" onclick="adjRes('warmup', -1)">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">RES</span><span id="val_res_warmup" class="ctrl-val c-res">10</span></div>
+                    <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_warmup" class="ctrl-val c-res">10</span></div>
                     <button class="ctrl-btn" onclick="adjRes('warmup', 1)">+</button>
                 </div>
                 <div class="control-group">
@@ -150,18 +149,34 @@
             </div>
         </div>
 
-        <div id="card_workout" class="phase-card">
-            <div class="phase-header"><span>WORKOUT</span><span id="timer_workout" class="phase-timer">15:00</span></div>
+        <div id="card_workout1" class="phase-card">
+            <div class="phase-header"><span>WORKOUT 1</span><span id="timer_workout1" class="phase-timer">15:00</span></div>
             <div class="controls-row">
                 <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjRes('workout', -1)">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">RES</span><span id="val_res_workout" class="ctrl-val c-res">24</span></div>
-                    <button class="ctrl-btn" onclick="adjRes('workout', 1)">+</button>
+                    <button class="ctrl-btn" onclick="adjRes('workout1', -1)">-</button>
+                    <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_workout1" class="ctrl-val c-res">24</span></div>
+                    <button class="ctrl-btn" onclick="adjRes('workout1', 1)">+</button>
                 </div>
                 <div class="control-group">
-                    <button class="ctrl-btn" onclick="adjTime('workout', -1)">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">TIME</span><span id="val_time_workout" class="ctrl-val">15</span></div>
-                    <button class="ctrl-btn" onclick="adjTime('workout', 1)">+</button>
+                    <button class="ctrl-btn" onclick="adjTime('workout1', -1)">-</button>
+                    <div class="col-center"><span class="ctrl-lbl">TIME</span><span id="val_time_workout1" class="ctrl-val">15</span></div>
+                    <button class="ctrl-btn" onclick="adjTime('workout1', 1)">+</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="card_workout2" class="phase-card">
+            <div class="phase-header"><span>WORKOUT 2</span><span id="timer_workout2" class="phase-timer">10:00</span></div>
+            <div class="controls-row">
+                <div class="control-group">
+                    <button class="ctrl-btn" onclick="adjRes('workout2', -1)">-</button>
+                    <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_workout2" class="ctrl-val c-res">20</span></div>
+                    <button class="ctrl-btn" onclick="adjRes('workout2', 1)">+</button>
+                </div>
+                <div class="control-group">
+                    <button class="ctrl-btn" onclick="adjTime('workout2', -1)">-</button>
+                    <div class="col-center"><span class="ctrl-lbl">TIME</span><span id="val_time_workout2" class="ctrl-val">10</span></div>
+                    <button class="ctrl-btn" onclick="adjTime('workout2', 1)">+</button>
                 </div>
             </div>
         </div>
@@ -171,7 +186,7 @@
             <div class="controls-row">
                 <div class="control-group">
                     <button class="ctrl-btn" onclick="adjRes('cooldown', -1)">-</button>
-                    <div class="col-center"><span class="ctrl-lbl">RES</span><span id="val_res_cooldown" class="ctrl-val c-res">10</span></div>
+                    <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_cooldown" class="ctrl-val c-res">10</span></div>
                     <button class="ctrl-btn" onclick="adjRes('cooldown', 1)">+</button>
                 </div>
                 <div class="control-group">
@@ -184,17 +199,11 @@
 
     </div>
 
-    <div class="action-area">
-        <button id="startBtn" class="main-btn" onclick="startWorkoutRoutine()">START</button>
-        <button id="stopBtn" class="main-btn" onclick="stopWorkout()">STOP</button>
-    </div>
-
-    <div id="console-log">V24 Ready. Waiting for user...</div>
+    <div id="console-log">V25 Loaded (Memory Enabled).</div>
 
 <script>
-    // 0. Base Utilities
+    // 0. Logging
     const logBox = document.getElementById('console-log');
-    
     function log(msg) {
         const d = new Date();
         const ts = `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
@@ -205,24 +214,26 @@
         console.log(msg);
     }
 
-    log("Initializing V24 System...");
+    log("Initializing V25...");
 
-    // 1. Bluetooth Constants (FULL UUIDs for iOS Stability)
+    // 1. Bluetooth Constants (Full UUID)
     const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
     const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
     const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
 
-    // 2. Global State
+    // 2. Global State & Default Settings
     let controlChar = null;
     let currentStatus = 'IDLE'; 
     let workoutInterval = null;
     let keeperInterval = null; 
     let lastCmdTime = 0;
 
-    const phases = {
-        warmup: { mins: 3, res: 10, remainingSecs: 180 },
-        workout: { mins: 15, res: 24, remainingSecs: 900 },
-        cooldown: { mins: 3, res: 10, remainingSecs: 180 }
+    // Default Configuration
+    let phases = {
+        warmup:   { mins: 3,  res: 10, remainingSecs: 180 },
+        workout1: { mins: 15, res: 24, remainingSecs: 900 },
+        workout2: { mins: 10, res: 20, remainingSecs: 600 },
+        cooldown: { mins: 3,  res: 10, remainingSecs: 180 }
     };
 
     // 3. UI Elements
@@ -237,76 +248,98 @@
         totalLabel: document.getElementById('totalLabel')
     };
 
-    // Initial Setup
-    updateTotalLabel();
-    log("UI Loaded. Bluetooth API Check: " + (navigator.bluetooth ? "OK" : "MISSING"));
+    // --- Persistence Logic (Save/Load) ---
+    
+    function loadSettings() {
+        const saved = localStorage.getItem('horizon_config_v25');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                // Merge saved values into phases
+                for (let key in parsed) {
+                    if (phases[key]) {
+                        phases[key].mins = parsed[key].mins;
+                        phases[key].res = parsed[key].res;
+                        // Recalculate seconds based on saved mins
+                        phases[key].remainingSecs = phases[key].mins * 60;
+                    }
+                }
+                log("Settings Loaded from Memory.");
+            } catch (e) {
+                log("Error loading settings, using defaults.");
+            }
+        }
+        refreshUI();
+    }
 
-    // --- Bluetooth Logic (Based on V23 Success) ---
+    function saveSettings() {
+        // Create a clean object to save (only mins and res)
+        const toSave = {};
+        for (let key in phases) {
+            toSave[key] = {
+                mins: phases[key].mins,
+                res: phases[key].res
+            };
+        }
+        localStorage.setItem('horizon_config_v25', JSON.stringify(toSave));
+        log("Settings Saved to Memory.");
+    }
+
+    function refreshUI() {
+        // Update all UI cards based on current phases object
+        for (let key in phases) {
+            document.getElementById(`val_res_${key}`).innerText = phases[key].res;
+            document.getElementById(`val_time_${key}`).innerText = phases[key].mins;
+            document.getElementById(`timer_${key}`).innerText = formatTime(phases[key].remainingSecs);
+        }
+        updateTotalLabel();
+    }
+
+    // Call load on init
+    loadSettings();
+
+
+    // --- Bluetooth Logic (V23 Core) ---
 
     window.startScan = async function() {
-        log(">>> Button: Start Scan");
-        
+        log(">>> Scan Button Clicked");
         if (!navigator.bluetooth) {
-            log("Error: Web Bluetooth API not found.");
-            alert("Error: Please use Bluefy Browser on iPad.");
+            alert("Error: Web Bluetooth API not found (Use Bluefy).");
             return;
         }
-
         try {
             ui.connectBtn.innerText = "Scanning...";
-            
-            // Critical: acceptAllDevices + Full UUID is the only stable combo
-            log("Requesting Device (acceptAllDevices: true)...");
             const device = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
                 optionalServices: [FTMS_UUID] 
             });
-
-            log(`Selected: ${device.name}`);
             await connectDevice(device);
-
         } catch (e) {
             log("Scan Error: " + e);
-            // Reset button if cancelled
-            if (String(e).includes("cancelled")) {
-                 ui.connectBtn.innerText = "1. Scan & Connect (3.0SC)";
-            } else {
-                 ui.connectBtn.innerText = "Retry Scan";
-                 alert("Scan Failed: " + e);
-            }
+            if (String(e).includes("cancelled")) ui.connectBtn.innerText = "1. Scan & Connect";
+            else alert("Scan Failed: " + e);
         }
     };
 
     async function connectDevice(device) {
         try {
-            log("Connecting GATT...");
             device.addEventListener('gattserverdisconnected', onDisconnect);
             const server = await device.gatt.connect();
-            
-            log("Getting Service...");
             const service = await server.getPrimaryService(FTMS_UUID);
-            
-            log("Getting Characteristics...");
             controlChar = await service.getCharacteristic(CTRL_UUID);
             const dataChar = await service.getCharacteristic(DATA_UUID);
-            
-            log("Starting Notifications...");
             await dataChar.startNotifications();
             dataChar.addEventListener('characteristicvaluechanged', parseData);
-
-            log("Sending Unlock Codes...");
             await sendHex(0x00);
             await sendHex(0x07);
 
-            log(">>> SUCCESS: Connected! <<<");
-            
-            // Update UI
+            log("Connected!");
             ui.btStatus.innerText = "Connected";
             ui.btStatus.classList.add('connected');
-            ui.connectBtn.style.display = 'none'; // Hide button on success
+            ui.connectBtn.style.display = 'none';
 
         } catch(e) {
-            log("Connection Error: " + e);
+            log("Conn Error: " + e);
             alert("Connection Error: " + e);
             ui.connectBtn.innerText = "Connection Failed";
         }
@@ -315,18 +348,12 @@
     // --- Workout Logic ---
 
     window.startWorkoutRoutine = function() {
-        if (currentStatus !== 'IDLE') {
-            log("Workout already running.");
-            return;
-        }
+        if (currentStatus !== 'IDLE') return;
         
-        if(!controlChar) {
-            log("Warning: Bluetooth not connected. Starting in Demo Mode.");
-        }
+        // Save settings before start
+        saveSettings();
 
-        log("Starting Routine -> WARMUP");
-        
-        // Wake up bike just in case
+        log("Starting... Waking bike");
         sendHex(0x07).then(() => {
             startPhase('WARMUP');
         });
@@ -338,13 +365,15 @@
         currentStatus = 'IDLE';
         document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
         
-        // Reset timers to defaults
-        resetTimers();
+        // Reset Logic
+        resetTimers(); // Reset time to full duration
         updateTotalLabel();
-        
-        // Drop resistance
         setResistance(1); 
-        log("Workout Stopped.");
+        
+        // Save settings on stop as requested
+        saveSettings();
+        
+        log("Stopped & Saved.");
     };
 
     function startPhase(phaseName) {
@@ -354,65 +383,60 @@
         currentStatus = phaseName;
         log(`>>> Phase: ${phaseName}`);
         
-        // UI Highlight
         document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
         let pKey = phaseName.toLowerCase();
-        let pData = phases[pKey];
+        
+        // Handle Workout 1/2 casing match
+        if(pKey === 'workout 1') pKey = 'workout1';
+        if(pKey === 'workout 2') pKey = 'workout2';
+
         document.getElementById(`card_${pKey}`).classList.add('active');
 
-        // 1. Send Target Resistance (Double Send Strategy)
+        // Apply Resistance
+        let pData = phases[pKey];
         setResistance(pData.res);
         setTimeout(() => setResistance(pData.res), 800);
 
-        // 2. Keeper: Re-send resistance every 3s to prevent bike reset
+        // Keeper
         keeperInterval = setInterval(() => {
-            if (currentStatus === phaseName) {
-                // Silent update (internal only)
-                setResistanceInternal(phases[pKey].res);
-            }
+            if (currentStatus === phaseName) setResistanceInternal(phases[pKey].res);
         }, 3000);
 
-        // 3. Timer Loop
+        // Timer
         workoutInterval = setInterval(() => tick(pKey), 1000);
     }
 
     function tick(phaseKey) {
-        // Phase Timer
         if (phases[phaseKey].remainingSecs > 0) {
             phases[phaseKey].remainingSecs--;
             document.getElementById(`timer_${phaseKey}`).innerText = formatTime(phases[phaseKey].remainingSecs);
         }
         
-        // Calculate Global Time Remaining
-        let totalSecs = phases.warmup.remainingSecs + phases.workout.remainingSecs + phases.cooldown.remainingSecs;
-        ui.globalTimer.innerText = formatTime(totalSecs);
+        // Global Total
+        let total = phases.warmup.remainingSecs + phases.workout1.remainingSecs + phases.workout2.remainingSecs + phases.cooldown.remainingSecs;
+        ui.globalTimer.innerText = formatTime(total);
 
-        // End of Phase Check
-        if (phases[phaseKey].remainingSecs <= 0) {
-            nextPhase(phaseKey);
-        }
+        if (phases[phaseKey].remainingSecs <= 0) nextPhase(phaseKey);
     }
 
     function nextPhase(current) {
-        if (current === 'warmup') startPhase('WORKOUT');
-        else if (current === 'workout') startPhase('COOLDOWN');
+        if (current === 'warmup') startPhase('WORKOUT1');
+        else if (current === 'workout1') startPhase('WORKOUT2');
+        else if (current === 'workout2') startPhase('COOLDOWN');
         else if (current === 'cooldown') {
             stopWorkout();
             alert("Workout Complete!");
         }
     }
 
-    // --- Adjust Functions (+/-) ---
+    // --- Helpers ---
 
     window.adjTime = function(phase, delta) {
         let p = phases[phase];
         p.mins += delta;
         if (p.mins < 1) p.mins = 1;
         
-        // Update UI
         document.getElementById(`val_time_${phase}`).innerText = p.mins;
-        
-        // Only update internal timer if IDLE (to avoid jumping during workout)
         if (currentStatus === 'IDLE') {
             p.remainingSecs = p.mins * 60;
             document.getElementById(`timer_${phase}`).innerText = formatTime(p.remainingSecs);
@@ -426,27 +450,26 @@
         if (p.res < 1) p.res = 1;
         if (p.res > 32) p.res = 32;
         
-        // Update UI
         document.getElementById(`val_res_${phase}`).innerText = p.res;
-        
-        // If we are currently in this phase, apply immediately
-        if (currentStatus === phase.toUpperCase()) {
-            setResistance(p.res);
-        }
+        if (currentStatus === phase.toUpperCase()) setResistance(p.res);
     };
 
     function resetTimers() {
         for (let key in phases) {
-            let p = phases[key];
-            p.remainingSecs = p.mins * 60;
-            document.getElementById(`timer_${key}`).innerText = formatTime(p.remainingSecs);
+            phases[key].remainingSecs = phases[key].mins * 60;
+            document.getElementById(`timer_${key}`).innerText = formatTime(phases[key].remainingSecs);
         }
-        ui.globalTimer.innerText = "00:00";
+        updateTotalLabel();
     }
 
     function updateTotalLabel() {
-        let total = phases.warmup.mins + phases.workout.mins + phases.cooldown.mins;
+        let total = phases.warmup.mins + phases.workout1.mins + phases.workout2.mins + phases.cooldown.mins;
         ui.totalLabel.innerText = `Total: ${total} Mins`;
+        // Also update the big display if IDLE
+        if(currentStatus === 'IDLE') {
+             let totalSec = total * 60;
+             ui.globalTimer.innerText = formatTime(totalSec);
+        }
     }
 
     function formatTime(sec) {
@@ -455,15 +478,11 @@
         return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
     }
 
-    // --- Helper Functions ---
-
     async function setResistance(val) {
         val = parseInt(val);
-        // Update UI immediately (Optimistic UI)
         if(ui.res) ui.res.innerText = val; 
-        lastCmdTime = Date.now(); // Mark time to ignore old data
-        
-        log(`Set Resistance: ${val}`);
+        lastCmdTime = Date.now(); 
+        log(`Set Level: ${val}`);
         await setResistanceInternal(val);
     }
 
@@ -474,7 +493,7 @@
         const view = new DataView(buffer);
         view.setUint8(0, 0x04);
         view.setUint16(1, target, true);
-        try { await controlChar.writeValue(buffer); } catch(e) { /* Ignore silent errors in keeper */ }
+        try { await controlChar.writeValue(buffer); } catch(e) {}
     }
 
     async function sendHex(byte) {
@@ -486,29 +505,20 @@
         const flags = val.getUint16(0, true);
         let offset = 2;
 
-        // Flags parsing according to FTMS
-        // Bit 0: Speed
         if ((flags & 0x01) === 0) { 
             ui.spd.innerText = (val.getUint16(offset, true) * 0.01).toFixed(1);
             offset += 2;
         }
-        // Bit 1: Avg Speed
         if (flags & 0x02) offset += 2;
-        // Bit 2: Cadence
         if (flags & 0x04) { 
             ui.rpm.innerText = Math.floor(val.getUint16(offset, true) * 0.5);
             offset += 2;
         }
-        // Bit 3: Avg Cadence
         if (flags & 0x08) offset += 2;
-        // Bit 4: Distance
         if (flags & 0x10) offset += 3;
         
-        // Bit 5: Resistance
         if (flags & 0x20) { 
             const r = val.getInt16(offset, true);
-            // UI Lock: Only update if we haven't sent a command recently (3s)
-            // This prevents the slider from jumping back to old values
             if (r > 0) {
                 if (Date.now() - lastCmdTime > 3000) {
                     ui.res.innerText = r;
@@ -517,7 +527,6 @@
             offset += 2;
         }
         
-        // Bit 6: Power
         if (flags & 0x40) { 
             ui.pwr.innerText = val.getInt16(offset, true);
             offset += 2;
@@ -528,10 +537,8 @@
         ui.btStatus.innerText = "Disconnected";
         ui.btStatus.classList.remove('connected');
         ui.connectBtn.style.display = 'block';
-        ui.connectBtn.innerText = "Re-Connect";
-        
         stopWorkout();
-        log("!!! DISCONNECTED !!!");
+        log("DISCONNECTED");
         alert("Bike Disconnected");
     }
 </script>
