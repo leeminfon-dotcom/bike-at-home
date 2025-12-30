@@ -649,75 +649,131 @@
         const W = ui.canvas.width;
         const H = ui.canvas.height;
         
-        // Clear
+        // --- 1. 定義邊距 (Margins) ---
+        const padLeft = 35;   // 左邊留白給 Y 軸數字
+        const padBottom = 20; // 下面留白給 X 軸數字
+        const graphW = W - padLeft;
+        const graphH = H - padBottom;
+
+        // 清除畫面
         ctx.clearRect(0,0,W,H);
         
-        // 1. Calculate Scales
-        // Total Time in Minutes
+        // --- 2. 計算比例 (Scales) ---
         const pOrder = ['warmup', 'workout1', 'workout2', 'cooldown'];
         let totalMins = 0;
         pOrder.forEach(k => totalMins += phases[k].mins);
         if(totalMins === 0) totalMins = 1;
 
-        const pxPerMin = W / totalMins;
-        const pxPerLevel = H / 35; // Leave some headroom (32 max)
+        // X軸比例: 每一分鐘佔多少像素
+        const pxPerMin = graphW / totalMins;
+        // Y軸比例: 設定最大值為 35 (讓 32 有點空間)，每一 Level 佔多少像素
+        const maxLevel = 35;
+        const pxPerLevel = graphH / maxLevel;
 
-        // 2. Draw Background (Gray Plans)
+        // --- 3. 繪製座標軸與格線 (Axes & Grid) ---
+        ctx.font = "10px monospace";
+        ctx.fillStyle = "#94a3b8"; // 文字顏色 (淡灰)
+        ctx.strokeStyle = "#334155"; // 格線顏色 (深灰)
+        ctx.lineWidth = 1;
+
+        // >> Y 軸 (Level)
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        // 每 5 級畫一條線
+        for(let l = 0; l <= maxLevel; l += 5) {
+            const y = graphH - (l * pxPerLevel); // 轉換 Y 座標 (Canvas 0 在上面)
+            
+            // 畫橫向格線
+            ctx.beginPath();
+            ctx.moveTo(padLeft, y);
+            ctx.lineTo(W, y);
+            ctx.stroke();
+
+            // 寫數字 (0, 5, 10...)
+            ctx.fillText(l, padLeft - 5, y);
+        }
+        // Y軸單位
+        ctx.save();
+        ctx.fillStyle = "#64748b";
+        ctx.fillText("LVL", padLeft - 5, 10); // 寫在左上角
+        ctx.restore();
+
+        // >> X 軸 (Time)
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        // 動態決定刻度間距 (如果總時長很短就每 2 分鐘，不然每 5 分鐘)
+        const xStep = totalMins <= 15 ? 2 : 5;
+        
+        for(let t = 0; t <= totalMins; t += xStep) {
+            const x = padLeft + (t * pxPerMin);
+            
+            // 寫數字 (0, 5, 10...)
+            ctx.fillText(t, x, graphH + 4);
+            
+            // 畫下方小刻度
+            ctx.beginPath();
+            ctx.moveTo(x, graphH);
+            ctx.lineTo(x, graphH + 3);
+            ctx.stroke();
+        }
+        // X軸單位 (寫在右下角)
+        ctx.textAlign = "right";
+        ctx.fillText("MIN", W, graphH + 4);
+
+        // --- 4. 繪製計畫背景 (Plan - Gray) ---
         let currentX = 0;
-        
-        // Helper to draw Rect: x, y, w, h
-        // Y coordinates: Canvas 0 is top. We want 0 at bottom.
-        // y = H - (level * pxPerLevel)
-        
-        ctx.fillStyle = "#334155"; // Surface color for Plan
-        
+        ctx.fillStyle = "#475569"; // 灰色柱狀圖
+
         pOrder.forEach(k => {
             const w = phases[k].mins * pxPerMin;
             const h = phases[k].res * pxPerLevel;
-            const x = currentX;
-            const y = H - h;
             
+            // 座標系統平移：X 要加上 padLeft，Y 要從 graphH 往上算
+            const x = padLeft + currentX;
+            const y = graphH - h;
+            
+            // 畫柱子
             ctx.fillRect(x, y, w, h);
             
-            // Separator line
+            // 畫階段分隔線 (垂直白線)
             ctx.beginPath();
-            ctx.moveTo(x+w, 0); ctx.lineTo(x+w, H);
-            ctx.strokeStyle = "#1e293b"; ctx.stroke();
+            ctx.strokeStyle = "#1e293b"; 
+            ctx.moveTo(x + w, 0); 
+            ctx.lineTo(x + w, graphH);
+            ctx.stroke();
 
             currentX += w;
         });
 
-        // 3. Draw Progress (Blue Fill)
-        // We need to calculate how many minutes have passed in total
-        // We know globalElapsedTime is handled in timerLoop, but that is since start.
-        // A better way is to calculate (Total - Remaining) for each phase.
-        
-        ctx.fillStyle = "rgba(59, 130, 246, 0.6)"; // Primary with opacity
-        
+        // --- 5. 繪製進度 (Progress - Blue) ---
+        ctx.fillStyle = "rgba(59, 130, 246, 0.7)"; // 藍色半透明
         let progressX = 0;
-        
+
         pOrder.forEach(k => {
             const p = phases[k];
             const durationSec = p.mins * 60;
+            // 計算這個階段過了多少秒
             const elapsedSec = durationSec - p.remainingSecs;
             
             const wFull = p.mins * pxPerMin;
             const h = p.res * pxPerLevel;
-            const y = H - h;
-            
-            // Draw the "Elapsed" portion of this block
+            const y = graphH - h; // 同樣要反轉 Y
+
             if(elapsedSec > 0) {
+                // 依比例計算寬度
                 const wProgress = (elapsedSec / durationSec) * wFull;
-                ctx.fillRect(progressX, y, wProgress, h);
+                // 注意 X 也要加上 padLeft
+                ctx.fillRect(padLeft + progressX, y, wProgress, h);
             }
             
             progressX += wFull;
         });
     }
-
+    
     // Run Init
     init();
 
 </script>
 </body>
 </html>
+
