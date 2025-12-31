@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V35.2 (Manual Bug Fix)</title>
+    <title>Horizon V35.3 (Manual Bug Fix)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -109,11 +109,11 @@
 </head>
 <body>
 
-<div id="debug-console">V35.2 Init...</div>
+<div id="debug-console">V35.3 Init...</div>
 
 <div class="app-container">
     <div class="sidebar">
-        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35.2</div>
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35.3</div>
         <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
 
         <div class="dash-grid">
@@ -219,8 +219,9 @@
     
     // Traffic Control
     let targetResistance = 1; 
-    let sentResistance = -99; // Force send on start
+    let sentResistance = -99; 
     let isWriting = false;    
+    let lastCmdTime = 0; // [新增] 記錄最後一次發送指令的時間
     let syncInterval = null;
     let workoutInterval;
 
@@ -330,24 +331,25 @@
     }
 
     // Traffic Control Loop (Fixed)
-    let lastWriteTime = 0; // 新增變數
+    let lastWriteTime = 0; // 新增變數記錄時間
 
     async function bleSyncLoop() {
         if(!controlChar) return;
 
-        // 1. 防死鎖：如果卡住超過 1 秒，強制解鎖
+        // 【防死鎖機制】如果寫入卡住超過 1000ms (1秒)，強制解鎖
         if(isWriting && (Date.now() - lastWriteTime > 1000)) {
-            isWriting = false;
+            isWriting = false; 
+            // rawLog("Auto-released lock", 'err'); // 測試用，可註解
         }
 
         if(isWriting) return;
         
         if(targetResistance !== sentResistance) {
             isWriting = true;
-            lastWriteTime = Date.now();
+            lastWriteTime = Date.now(); // 記錄開始寫入的時間
             
             try {
-                // 2. 介面同步：發送前先更新儀表板數字
+                // 1. 介面同步：發送前先更新儀表板數字 (Optimistic UI)
                 if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
 
                 rawLog(`TX Level: ${targetResistance}`, 'tx');
@@ -358,12 +360,14 @@
                 v.setUint16(1, targetResistance * 10, true); 
                 
                 await controlChar.writeValue(buf);
+
+                lastCmdTime = Date.now();
                 
                 sentResistance = targetResistance;
                 // rawLog(`TX OK`, 'succ');
                 
             } catch(e) {
-                // rawLog(`TX Fail`, 'err');
+                // rawLog(`TX Fail: ${e.message}`, 'err');
             } finally {
                 isWriting = false;
             }
@@ -454,11 +458,11 @@
         const c = document.getElementById(`card_${k}`);
         if(c) c.classList.add('active');
         
-        // 強制重送
+        // 1. 強制重送 (Force Loop to send)
         sentResistance = -99; 
         targetResistance = phases[k].res;
         
-        // 強制更新儀表板
+        // 2. 強制更新儀表板 (Force UI update)
         if(ui.res) ui.res.innerText = targetResistance;
         
         rawLog(`Phase ${k}. Target: ${targetResistance}`);
@@ -504,37 +508,68 @@
         const v = e.target.value;
         const f = v.getUint16(0, true);
         let off = 2;
-        if(!(f&1)) { document.getElementById('spdVal').innerText=(v.getUint16(off,true)*0.01).toFixed(1); off+=2; }
+
+        // 1. Speed (Bit 0)
+        if(!(f&1)) { 
+            document.getElementById('spdVal').innerText = (v.getUint16(off,true)*0.01).toFixed(1); 
+            off+=2; 
+        }
+        // 2. Average Speed (Bit 1) - Skip
         if(f&2) off+=2;
-        if(f&4) { document.getElementById('rpmVal').innerText=Math.floor(v.getUint16(off,true)*0.5); off+=2; }
+        
+        // 3. Cadence/RPM (Bit 2)
+        if(f&4) { 
+            document.getElementById('rpmVal').innerText = Math.floor(v.getUint16(off,true)*0.5); 
+            off+=2; 
+        }
+        // 4. Average Cadence (Bit 3) - Skip
         if(f&8) off+=2;
+        // 5. Total Distance (Bit 4) - Skip (3 bytes)
         if(f&16) off+=3;
+        
+        // 6. Resistance Level (Bit 5) --- [關鍵修改] ---
         if(f&32) {
-            // Resistance from bike (feedback)
-            // const r = v.getInt16(off,true);
-            // We ignore updating UI from bike to avoid fighting with user input
+            const realLevel = v.getInt16(off, true);
+            
+            // 只有當「距離上次發送指令超過 3 秒」才更新儀表板
+            // 這樣可以避免調整時數字亂跳，但平穩時又能顯示真實數據
+            if (Date.now() - lastCmdTime > 3000) {
+                if(ui.res) ui.res.innerText = realLevel;
+                // 如果需要，也可以在這裡反向更新 targetResistance，保持同步
+                // targetResistance = realLevel; 
+            }
             off+=2;
         }
-        if(f&64) document.getElementById('pwrVal').innerText=v.getInt16(off,true);
+        
+        // 7. Instantaneous Power (Bit 6)
+        if(f&64) {
+            document.getElementById('pwrVal').innerText = v.getInt16(off,true);
+            // off+=2;
+        }
     }
 
     function refreshUI() {
-        let tm=0, tr=0;
+        let totalPlanMins = 0;
+        let totalRemainingSecs = 0;
+
         for(let k in phases) {
+            // 更新個別卡片
             document.getElementById(`val_res_${k}`).innerText = phases[k].res;
             document.getElementById(`val_time_${k}`).innerText = phases[k].mins;
             document.getElementById(`timer_${k}`).innerText = fmt(phases[k].remainingSecs);
-            tm += phases[k].mins; 
-            tr += phases[k].remainingSecs;
+            
+            // 累加總數
+            totalPlanMins += phases[k].mins;
+            totalRemainingSecs += phases[k].remainingSecs;
         }
         
-        // 大數字顯示倒數 (tr)
-        if(ui.globalTimer) ui.globalTimer.innerText = fmt(tr);
+        // 1. 大數字顯示：總剩餘秒數 (倒數)
+        if(ui.globalTimer) ui.globalTimer.innerText = fmt(totalRemainingSecs);
         
-        // 小標籤顯示總計畫長度 (tm)
-        if(ui.totalLabel) ui.totalLabel.innerText = "Plan: " + tm + " Mins";
+        // 2. 小標題顯示：總計畫分鐘數 (固定)
+        if(ui.totalLabel) ui.totalLabel.innerText = "Plan: " + totalPlanMins + " Mins";
 
-        // 確保儀表板 Level 也是對的
+        // 3. 確保儀表板 Level 與目標一致 (如果正在運動中)
         if(currentStatus !== 'IDLE' && ui.res) {
             ui.res.innerText = targetResistance;
         }
@@ -643,5 +678,6 @@
 </script>
 </body>
 </html>
+
 
 
