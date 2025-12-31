@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V35.7 (DEBUG MODE)</title>
+    <title>Horizon V35.8 (DEBUG MODE)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -108,11 +108,11 @@
 </head>
 <body>
 
-<div id="debug-console">V35.7 DEBUG Init...</div>
+<div id="debug-console">V35.8 DEBUG Init...</div>
 
 <div class="app-container">
     <div class="sidebar">
-        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35.7</div>
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35.8</div>
         <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
 
         <div class="dash-grid">
@@ -331,6 +331,7 @@
     async function bleSyncLoop() {
         if(!controlChar) return;
 
+        // 1. 防死鎖機制 (維持原樣)
         if(isWriting && (Date.now() - lastWriteTime > 1000)) {
             rawLog("Watchdog: Resetting isWriting lock", 'err');
             isWriting = false;
@@ -338,41 +339,35 @@
 
         if(isWriting) return;
         
+        // 只有當目標阻力與上次發送的不同，才進行發送
         if(targetResistance !== sentResistance) {
-            // Log the trigger reason
-            rawLog(`[LOOP] Sync Triggered. Target=${targetResistance}, Sent=${sentResistance}`, 'dbg');
-
+            
             isWriting = true;
             lastWriteTime = Date.now();
             
             try {
                 if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
 
-                // Step 1: Request Control
-                rawLog(`[1/2] Writing 0x00 (ReqControl)...`, 'tx');
-                await controlChar.writeValue(new Uint8Array([0x00]));
-                
-                // Wait
-                rawLog(`[1/2] 0x00 Written. Sleeping 150ms...`, 'dbg');
-                await sleep(150); 
-                
-                // Step 2: Set Resistance
-                rawLog(`[2/2] Writing 0x04 (SetRes) to ${targetResistance}...`, 'tx');
+                rawLog(`[TX] Setting Resistance to ${targetResistance}...`, 'tx');
+
+                // --- 修正開始：移除 0x00 和 Sleep，直接發送 0x04 ---
                 
                 const buf = new ArrayBuffer(3);
                 const v = new DataView(buf);
-                v.setUint8(0, 0x04); 
-                v.setUint16(1, targetResistance * 10, true); 
+                v.setUint8(0, 0x04); // OpCode: Set Target Resistance
+                v.setUint16(1, targetResistance * 10, true); // Value unit 0.1
                 
                 await controlChar.writeValue(buf);
+                // --- 修正結束 ---
                 
-                rawLog(`[2/2] 0x04 Written. Success.`, 'succ');
+                rawLog(`[TX] 0x04 Written (Res: ${targetResistance})`, 'succ');
                 sentResistance = targetResistance;
                 lastCmdTime = Date.now();
                 
             } catch(e) {
+                // 發送失敗才重置，讓下一次迴圈重試
                 sentResistance = -99; 
-                rawLog(`TX ERROR detected: ${e.message}`, 'err');
+                rawLog(`TX ERROR: ${e.message}`, 'err');
             } finally {
                 isWriting = false;
             }
@@ -676,3 +671,4 @@
 </script>
 </body>
 </html>
+
