@@ -2,7 +2,8 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Horizon V39 (Safe Layout)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Horizon V40 (V35 Base + Fixes)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -11,12 +12,9 @@
                 const ln = document.createElement('div');
                 const ts = new Date().toLocaleTimeString().split(' ')[0];
                 ln.textContent = `[${ts}] ${msg}`;
-                // 直接寫死顏色，不依賴 class
-                if(type==='err') ln.style.color = 'red';
-                else if(type==='tx') ln.style.color = 'blue';
-                else if(type==='succ') ln.style.color = 'green';
-                else ln.style.color = '#333';
-                
+                if(type==='err') ln.className = 'log-err';
+                if(type==='tx') ln.className = 'log-tx';
+                if(type==='succ') ln.className = 'log-succ';
                 el.appendChild(ln);
                 el.scrollTop = el.scrollHeight;
             }
@@ -27,232 +25,193 @@
     </script>
 
     <style>
-        /* V39: 極簡安全樣式 (Fail-Safe CSS) */
+        :root {
+            --bg: #0f172a; --sidebar: #1e293b; --surface: #334155;
+            --primary: #3b82f6; --text: #f8fafc; --text-muted: #94a3b8;
+            --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899;
+        }
         body {
-            background-color: #ffffff !important; /* 強制白色背景 */
-            color: #000000 !important; /* 強制黑色文字 */
-            font-family: sans-serif;
-            margin: 0;
-            padding: 10px;
-            overflow: auto; /* 允許捲動 */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg); color: var(--text);
+            margin: 0; padding: 0; height: 100vh; display: flex; overflow: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* 儀表板區域 */
-        .dashboard-container {
-            border: 2px solid #000;
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            background: #f0f0f0;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr); /* 4欄 */
-            gap: 5px;
-            text-align: center;
-            margin-bottom: 10px;
-        }
-        .stat-box {
-            background: #fff;
-            border: 1px solid #999;
-            padding: 5px;
-            border-radius: 4px;
-        }
-        .stat-val { font-size: 20px; font-weight: bold; display: block; }
-        .stat-label { font-size: 10px; color: #555; }
-
-        /* 按鈕區域 */
-        .btn-row {
-            display: flex; gap: 5px; margin-bottom: 5px;
-        }
-        button {
-            padding: 10px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            border: 1px solid #000;
-            border-radius: 4px;
-            background: #ddd;
-            color: #000;
-        }
-        #connectBtn { background: #aaf; width: 100%; display: block; margin-bottom: 5px; }
-        #startBtn { background: #afa; width: 100%; display: block; margin-bottom: 5px; }
-        #stopBtn { background: #faa; width: 100%; display: block; margin-bottom: 5px; }
-
-        /* 圖表區域 */
-        .chart-container {
-            width: 100%;
-            height: 200px;
-            border: 2px solid #000;
-            background: #fff;
-            margin-bottom: 20px;
-        }
-        canvas { width: 100%; height: 100%; }
-
-        /* 階段列表 */
-        .phase-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-        .phase-item {
-            border: 1px solid #ccc;
-            padding: 10px;
-            background: #fff;
-        }
-        .phase-item.active {
-            border: 3px solid blue;
-            background: #eef;
-        }
-        .ctrl-row {
-            display: flex; justify-content: space-between; align-items: center; margin-top: 5px;
-        }
-        .ctrl-group {
-            display: flex; align-items: center; gap: 5px; background: #eee; padding: 3px; border-radius: 4px;
-        }
-        .tiny-btn {
-            width: 25px; height: 25px; background: #999; color: white; border: none; border-radius: 50%;
-        }
-
-        /* Console - 改為靜態顯示在底部 */
+        /* Console */
         #debug-console {
-            width: 100%;
-            height: 150px;
-            background: #eee;
-            border: 2px solid #333;
-            overflow-y: scroll;
-            font-family: monospace;
-            font-size: 12px;
-            padding: 5px;
-            margin-top: 20px;
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 150px;
+            background: rgba(0,0,0,0.95); color: #ccc; border-top: 2px solid #555;
+            font-size: 11px; padding: 10px; overflow-y: scroll; font-family: monospace;
+            z-index: 99999; box-sizing: border-box; white-space: pre-wrap;
         }
+        .log-err { color: #ff5555; font-weight: bold; }
+        .log-tx { color: #ffff55; }
+        .log-succ { color: #55ff55; }
+
+        /* Layout (V37 Fix: Increased Padding) */
+        .app-container { display: flex; width: 100%; height: 100%; }
+        
+        .sidebar {
+            width: 320px; background: var(--sidebar); padding: 20px; 
+            display: flex; flex-direction: column; border-right: 1px solid #475569;
+            flex-shrink: 0; overflow-y: auto;
+            padding-bottom: 250px; 
+        }
+        
+        .content {
+            flex: 1; padding: 20px; overflow-y: auto; position: relative;
+            display: flex; flex-direction: column; align-items: center;
+            padding-bottom: 250px; 
+        }
+
+        @media (max-width: 820px) {
+            .app-container { flex-direction: column; }
+            .sidebar { width: 100%; border-right: none; height: auto; flex:none; padding-bottom: 20px; }
+            .content { width: 100%; padding-bottom: 250px; }
+        }
+
+        /* UI */
+        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; width: 100%; }
+        .mini-card { background: var(--surface); padding: 10px; border-radius: 12px; text-align: center; }
+        .mini-val { font-size: 24px; font-weight: 800; }
+        .mini-lbl { font-size: 10px; color: var(--text-muted); }
+        .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } 
+        .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
+
+        .main-btn {
+            width: 100%; padding: 15px; margin-bottom: 10px; border-radius: 10px; border: none; 
+            font-weight: bold; font-size: 16px; color: white; cursor: pointer;
+        }
+        .btn-connect { background: var(--primary); }
+        .btn-start { background: #10b981; }
+        .btn-stop { background: #ef4444; }
+        
+        .jump-row { display: flex; gap: 10px; margin-bottom: 10px; width: 100%; }
+        .btn-jump { flex: 1; background: #475569; color: white; border: none; padding: 12px; border-radius: 8px; }
+
+        .chart-box {
+            width: 100%; max-width: 600px; height: 200px; 
+            background: #1e293b; border-radius: 12px; margin-bottom: 20px;
+            flex-shrink: 0;
+        }
+        canvas { width: 100%; height: 100%; display: block; }
+
+        .global-timer { font-size: 48px; font-weight: bold; margin-bottom: 5px; }
+        
+        .phase-list { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+        .phase-card { background: #1e293b; padding: 15px; border-radius: 12px; border: 1px solid #334155; }
+        .phase-card.active { border-color: var(--primary); background: #17253d; }
+        .phase-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; }
+        
+        .controls-row { display: flex; gap: 10px; }
+        .control-group { background: rgba(0,0,0,0.2); padding: 5px; border-radius: 8px; flex: 1; display: flex; justify-content: space-between; align-items: center; }
+        .ctrl-btn { width: 30px; height: 30px; border-radius: 50%; border: none; background: #475569; color: white; }
     </style>
 </head>
 <body>
 
-    <div class="dashboard-container">
-        <div style="margin-bottom: 5px; font-weight: bold;">HORIZON V39 (SAFE MODE)</div>
-        <div id="btStatus" style="margin-bottom: 10px; color: blue;">Waiting...</div>
+<div id="debug-console">V40 Init...</div>
 
-        <div class="stats-grid">
-            <div class="stat-box"><span id="rpmVal" class="stat-val">0</span><span class="stat-label">RPM</span></div>
-            <div class="stat-box"><span id="pwrVal" class="stat-val">0</span><span class="stat-label">WATT</span></div>
-            <div class="stat-box"><span id="spdVal" class="stat-val">0.0</span><span class="stat-label">KMH</span></div>
-            <div class="stat-box"><span id="resVal" class="stat-val">--</span><span class="stat-label">LEVEL</span></div>
+<div class="app-container">
+    <div class="sidebar">
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V40</div>
+        <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
+
+        <div class="dash-grid">
+            <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
+            <div class="mini-card"><div id="pwrVal" class="mini-val c-pwr">0</div><div class="mini-lbl">WATT</div></div>
+            <div class="mini-card"><div id="spdVal" class="mini-val c-spd">0.0</div><div class="mini-lbl">KMH</div></div>
+            <div class="mini-card"><div id="resVal" class="mini-val c-res">--</div><div class="mini-lbl">LEVEL</div></div>
         </div>
 
-        <button id="connectBtn">Connect Bluetooth</button>
-        <button id="startBtn">START WORKOUT</button>
-        <div class="btn-row">
-            <button id="prevBtn" style="flex:1">&lt; Prev</button>
-            <button id="nextBtn" style="flex:1">Next &gt;</button>
+        <button id="connectBtn" class="main-btn btn-connect">1. Connect</button>
+        <button id="startBtn" class="main-btn btn-start">START</button>
+        <div class="jump-row">
+            <button id="prevBtn" class="btn-jump">&lt; PREV</button>
+            <button id="nextBtn" class="btn-jump">NEXT &gt;</button>
         </div>
-        <button id="stopBtn">STOP</button>
-        <button id="resetBtn" style="width:100%">Factory Reset</button>
+        <button id="stopBtn" class="main-btn btn-stop">STOP</button>
+        <button id="resetBtn" style="background:none; border:1px solid #555; color:#888; padding:8px; width:100%;">Reset Settings</button>
     </div>
 
-    <div style="text-align: center; margin-bottom: 10px;">
-        <div id="globalTimer" style="font-size: 40px; font-weight: bold;">00:00</div>
-        <div id="totalLabel">Total Remaining</div>
-    </div>
+    <div class="content">
+        <div class="chart-box"><canvas id="workoutChart"></canvas></div>
+        <div id="globalTimer" class="global-timer">00:00</div>
+        <div id="totalLabel" style="color:#666; margin-bottom:20px;">Total Plan: --</div>
 
-    <div class="chart-container">
-        <canvas id="workoutChart"></canvas>
-    </div>
+        <div class="phase-list">
+            <div id="card_warmup" class="phase-card">
+                <div class="phase-header"><span>WARM UP</span><span id="timer_warmup">00:00</span></div>
+                <div class="controls-row">
+                    <div class="control-group">
+                        <button id="btn_warmup_res_minus" class="ctrl-btn">-</button>
+                        <span id="val_res_warmup" style="font-weight:bold;">--</span>
+                        <button id="btn_warmup_res_plus" class="ctrl-btn">+</button>
+                    </div>
+                    <div class="control-group">
+                        <button id="btn_warmup_time_minus" class="ctrl-btn">-</button>
+                        <span id="val_time_warmup" style="font-weight:bold;">--</span>
+                        <button id="btn_warmup_time_plus" class="ctrl-btn">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="card_workout1" class="phase-card">
+                <div class="phase-header"><span>WORKOUT 1</span><span id="timer_workout1">00:00</span></div>
+                <div class="controls-row">
+                    <div class="control-group">
+                        <button id="btn_workout1_res_minus" class="ctrl-btn">-</button>
+                        <span id="val_res_workout1" style="font-weight:bold;">--</span>
+                        <button id="btn_workout1_res_plus" class="ctrl-btn">+</button>
+                    </div>
+                    <div class="control-group">
+                        <button id="btn_workout1_time_minus" class="ctrl-btn">-</button>
+                        <span id="val_time_workout1" style="font-weight:bold;">--</span>
+                        <button id="btn_workout1_time_plus" class="ctrl-btn">+</button>
+                    </div>
+                </div>
+            </div>
 
-    <div class="phase-list">
-        <div id="card_warmup" class="phase-item">
-            <div style="display:flex; justify-content:space-between; font-weight:bold;">
-                <span>WARM UP</span>
-                <span id="timer_warmup">00:00</span>
-            </div>
-            <div class="ctrl-row">
-                <div class="ctrl-group">
-                    <span>Res:</span>
-                    <button id="btn_warmup_res_minus" class="tiny-btn">-</button>
-                    <span id="val_res_warmup">--</span>
-                    <button id="btn_warmup_res_plus" class="tiny-btn">+</button>
-                </div>
-                <div class="ctrl-group">
-                    <span>Min:</span>
-                    <button id="btn_warmup_time_minus" class="tiny-btn">-</button>
-                    <span id="val_time_warmup">--</span>
-                    <button id="btn_warmup_time_plus" class="tiny-btn">+</button>
+            <div id="card_workout2" class="phase-card">
+                <div class="phase-header"><span>WORKOUT 2</span><span id="timer_workout2">00:00</span></div>
+                <div class="controls-row">
+                    <div class="control-group">
+                        <button id="btn_workout2_res_minus" class="ctrl-btn">-</button>
+                        <span id="val_res_workout2" style="font-weight:bold;">--</span>
+                        <button id="btn_workout2_res_plus" class="ctrl-btn">+</button>
+                    </div>
+                    <div class="control-group">
+                        <button id="btn_workout2_time_minus" class="ctrl-btn">-</button>
+                        <span id="val_time_workout2" style="font-weight:bold;">--</span>
+                        <button id="btn_workout2_time_plus" class="ctrl-btn">+</button>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div id="card_workout1" class="phase-item">
-            <div style="display:flex; justify-content:space-between; font-weight:bold;">
-                <span>WORKOUT 1</span>
-                <span id="timer_workout1">00:00</span>
-            </div>
-            <div class="ctrl-row">
-                <div class="ctrl-group">
-                    <span>Res:</span>
-                    <button id="btn_workout1_res_minus" class="tiny-btn">-</button>
-                    <span id="val_res_workout1">--</span>
-                    <button id="btn_workout1_res_plus" class="tiny-btn">+</button>
-                </div>
-                <div class="ctrl-group">
-                    <span>Min:</span>
-                    <button id="btn_workout1_time_minus" class="tiny-btn">-</button>
-                    <span id="val_time_workout1">--</span>
-                    <button id="btn_workout1_time_plus" class="tiny-btn">+</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="card_workout2" class="phase-item">
-            <div style="display:flex; justify-content:space-between; font-weight:bold;">
-                <span>WORKOUT 2</span>
-                <span id="timer_workout2">00:00</span>
-            </div>
-            <div class="ctrl-row">
-                <div class="ctrl-group">
-                    <span>Res:</span>
-                    <button id="btn_workout2_res_minus" class="tiny-btn">-</button>
-                    <span id="val_res_workout2">--</span>
-                    <button id="btn_workout2_res_plus" class="tiny-btn">+</button>
-                </div>
-                <div class="ctrl-group">
-                    <span>Min:</span>
-                    <button id="btn_workout2_time_minus" class="tiny-btn">-</button>
-                    <span id="val_time_workout2">--</span>
-                    <button id="btn_workout2_time_plus" class="tiny-btn">+</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="card_cooldown" class="phase-item">
-            <div style="display:flex; justify-content:space-between; font-weight:bold;">
-                <span>COOL DOWN</span>
-                <span id="timer_cooldown">00:00</span>
-            </div>
-            <div class="ctrl-row">
-                <div class="ctrl-group">
-                    <span>Res:</span>
-                    <button id="btn_cooldown_res_minus" class="tiny-btn">-</button>
-                    <span id="val_res_cooldown">--</span>
-                    <button id="btn_cooldown_res_plus" class="tiny-btn">+</button>
-                </div>
-                <div class="ctrl-group">
-                    <span>Min:</span>
-                    <button id="btn_cooldown_time_minus" class="tiny-btn">-</button>
-                    <span id="val_time_cooldown">--</span>
-                    <button id="btn_cooldown_time_plus" class="tiny-btn">+</button>
+            <div id="card_cooldown" class="phase-card">
+                <div class="phase-header"><span>COOL DOWN</span><span id="timer_cooldown">00:00</span></div>
+                <div class="controls-row">
+                    <div class="control-group">
+                        <button id="btn_cooldown_res_minus" class="ctrl-btn">-</button>
+                        <span id="val_res_cooldown" style="font-weight:bold;">--</span>
+                        <button id="btn_cooldown_res_plus" class="ctrl-btn">+</button>
+                    </div>
+                    <div class="control-group">
+                        <button id="btn_cooldown_time_minus" class="ctrl-btn">-</button>
+                        <span id="val_time_cooldown" style="font-weight:bold;">--</span>
+                        <button id="btn_cooldown_time_plus" class="ctrl-btn">+</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <div style="font-weight:bold;">Debug Log:</div>
-    <div id="debug-console">V39 Safe Mode Loaded.</div>
-
+</div>
 
 <script>
+    // --- 0. SCRIPT START ---
+    // If you see this in log, JS file is loaded
+    rawLog('Script Loaded. Parsing...');
+
     // --- 1. CONFIG & STATE ---
     const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
     const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
@@ -263,15 +222,12 @@
     let currentPhase = null; 
     const phaseOrder = ['warmup', 'workout1', 'workout2', 'cooldown'];
     
-    // Traffic Control
+    // Traffic Control (V37 Fix)
     let targetResistance = 1; 
     let sentResistance = -99; 
     let isWriting = false;    
     let syncInterval = null;
     let workoutInterval;
-
-    // Time Tracking
-    let totalElapsed = 0; 
 
     const defaultPhases = {
         warmup:   { mins: 3,  res: 15 },
@@ -282,10 +238,13 @@
     let phases = JSON.parse(JSON.stringify(defaultPhases));
     let ui = {};
 
-    // --- 2. STARTUP ---
+    // --- 2. STARTUP (EXACT COPY OF V35 STRATEGY) ---
     window.onload = function() {
-        try { initApp(); } 
-        catch(e) { rawLog(`INIT ERROR: ${e.message}`, 'err'); }
+        try { 
+            initApp(); 
+        } catch(e) { 
+            rawLog(`INIT ERROR: ${e.message}`, 'err'); 
+        }
     };
 
     function initApp() {
@@ -294,6 +253,7 @@
             connectBtn: document.getElementById('connectBtn'),
             startBtn: document.getElementById('startBtn'),
             canvas: document.getElementById('workoutChart'),
+            // V37 Fix: Correct ID mapping
             totalLabel: document.getElementById('totalLabel'),
             globalTimer: document.getElementById('globalTimer'),
             res: document.getElementById('resVal')
@@ -301,6 +261,7 @@
 
         if(!ui.connectBtn) throw new Error("UI Load Fail");
 
+        // Event Binding
         safeBind('connectBtn', startScan);
         safeBind('startBtn', toggleWorkout);
         safeBind('stopBtn', stopWorkout);
@@ -318,20 +279,14 @@
         loadSettings();
         refreshUI();
         
-        // Show Last Device
-        const lastDev = localStorage.getItem('last_device_name');
-        if(lastDev) {
-            rawLog(`Last Device: ${lastDev}`);
-            ui.btStatus.innerText = `Last Device: ${lastDev}`;
-        }
-        
+        // Start Sync Loop (Always running to catch manual changes)
         if(syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(bleSyncLoop, 250);
 
         setTimeout(() => { resizeCanvas(); drawChart(); }, 300);
         window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
         
-        rawLog("System Ready (Safe Mode).");
+        rawLog("System Ready (V40).");
     }
 
     function safeBind(id, fn) {
@@ -349,11 +304,7 @@
                 optionalServices: [FTMS_UUID]
             });
             
-            rawLog(`Device: ${dev.name} (${dev.id})`);
-            
-            // Save Device Info
-            localStorage.setItem('last_device_name', dev.name);
-            localStorage.setItem('last_device_id', dev.id);
+            rawLog(`Device: ${dev.name}`);
             
             dev.addEventListener('gattserverdisconnected', onDisconnect);
             const server = await dev.gatt.connect();
@@ -364,31 +315,34 @@
             await dataChar.startNotifications();
             dataChar.addEventListener('characteristicvaluechanged', parseData);
 
-            rawLog("Handshake: Request Control...", 'tx');
+            // Slower handshake for stability
+            rawLog("Handshake...", 'tx');
             await sendHexDirect(0x00); 
             await sleep(200); 
-            
-            rawLog("Handshake: Start/Resume...", 'tx');
             await sendHexDirect(0x07);
             await sleep(200);
 
             ui.btStatus.innerText = "Connected: " + dev.name;
-            ui.btStatus.style.color = "green";
+            ui.btStatus.style.color = "#3b82f6";
             ui.connectBtn.style.display = 'none';
             rawLog("Connected!", 'succ');
             
         } catch(e) {
-            ui.connectBtn.innerText = "Connect Bluetooth";
+            ui.connectBtn.innerText = "Connect";
             rawLog(`Connect Fail: ${e.message}`, 'err');
         }
     }
 
+    // Traffic Control Loop
     async function bleSyncLoop() {
         if(!controlChar || isWriting) return;
         
         if(targetResistance !== sentResistance) {
             isWriting = true;
             try {
+                // V37 Fix: Update Dashboard Level from Target immediately
+                if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
+
                 rawLog(`TX Level: ${targetResistance}...`, 'tx');
                 
                 const buf = new ArrayBuffer(3);
@@ -397,10 +351,275 @@
                 v.setUint16(1, targetResistance * 10, true); 
                 
                 await controlChar.writeValue(buf);
-                
                 sentResistance = targetResistance;
-                rawLog(`TX Success: Lvl ${targetResistance}`, 'succ');
+                rawLog(`TX OK: ${targetResistance}`, 'succ');
                 
             } catch(e) {
-                rawLog(`TX Busy/Fail: ${e.message}`, 'err');
+                rawLog(`TX Fail: ${e.message}`, 'err');
             } finally {
+                isWriting = false;
+            }
+        }
+    }
+    
+    async function sendHexDirect(b) {
+        if(controlChar) await controlChar.writeValue(new Uint8Array([b])).catch(e=>rawLog("HexErr:"+e));
+    }
+    
+    function onDisconnect() {
+        ui.btStatus.innerText = "Disconnected";
+        ui.btStatus.style.color = "#666";
+        ui.connectBtn.style.display = 'block';
+        if(currentStatus!=='IDLE') stopWorkout();
+        rawLog("Disconnected", 'err');
+    }
+
+    // --- 4. WORKOUT LOGIC ---
+    function toggleWorkout() {
+        if(currentStatus==='IDLE') startWorkout();
+        else if(currentStatus==='RUNNING') pauseWorkout();
+        else resumeWorkout();
+    }
+
+    function startWorkout() {
+        saveSettings();
+        if(!controlChar) rawLog("Demo Mode", 'err');
+        sendHexDirect(0x07); // Ensure Wake
+        
+        if(!currentPhase) currentPhase = 'warmup';
+        currentStatus = 'RUNNING';
+        updateBtns();
+        
+        if(workoutInterval) clearInterval(workoutInterval);
+        workoutInterval = setInterval(timerLoop, 1000);
+        
+        activatePhase(currentPhase);
+        rawLog("Started.");
+    }
+
+    function pauseWorkout() {
+        currentStatus = 'PAUSED';
+        clearInterval(workoutInterval);
+        updateBtns();
+        rawLog("Paused.");
+    }
+
+    function resumeWorkout() {
+        currentStatus = 'RUNNING';
+        updateBtns();
+        workoutInterval = setInterval(timerLoop, 1000);
+        sentResistance = -99; // Force resend on resume
+        rawLog("Resumed.");
+    }
+
+    function stopWorkout() {
+        currentStatus = 'IDLE';
+        currentPhase = null;
+        clearInterval(workoutInterval);
+        updateBtns();
+        document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
+        resetTimers(); refreshUI();
+        
+        // Reset Level
+        targetResistance = 1; 
+        if(ui.res) ui.res.innerText = "1";
+        
+        saveSettings(); drawChart();
+        rawLog("Stopped.");
+    }
+
+    function jumpPhase(dir) {
+        let idx = phaseOrder.indexOf(currentPhase||'warmup');
+        if(dir==='next') idx++; else idx--;
+        if(idx<0 || idx>=phaseOrder.length) return rawLog("End of list");
+        
+        const k = phaseOrder[idx];
+        phases[k].remainingSecs = phases[k].mins*60;
+        activatePhase(k);
+        refreshUI(); drawChart();
+        rawLog(`Jump > ${k}`);
+    }
+
+    function activatePhase(k) {
+        currentPhase = k;
+        document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
+        const c = document.getElementById(`card_${k}`);
+        if(c) c.classList.add('active');
+        
+        // V37 Fix: Force Resend
+        sentResistance = -99; 
+        targetResistance = phases[k].res;
+        
+        // V37 Fix: Immediate Dashboard Update
+        if(ui.res) ui.res.innerText = targetResistance;
+        
+        rawLog(`Phase ${k}. Target: ${targetResistance}`);
+    }
+
+    function timerLoop() {
+        if(!currentPhase) return;
+        if(phases[currentPhase].remainingSecs > 0) phases[currentPhase].remainingSecs--;
+        else {
+            let idx = phaseOrder.indexOf(currentPhase);
+            if(idx < phaseOrder.length - 1) activatePhase(phaseOrder[idx+1]);
+            else { stopWorkout(); alert("Finished!"); }
+        }
+        refreshUI(); drawChart();
+    }
+
+    // --- 5. DATA & UI ---
+    function adjTime(p, d) {
+        if(phases[p].mins+d < 1) return;
+        phases[p].mins += d;
+        if(currentStatus==='IDLE' || currentPhase!==p) phases[p].remainingSecs = phases[p].mins*60;
+        else {
+            phases[p].remainingSecs += (d*60);
+            if(phases[p].remainingSecs < 0) phases[p].remainingSecs = 0;
+        }
+        refreshUI(); drawChart();
+    }
+
+    function adjRes(p, d) {
+        phases[p].res += d;
+        if(phases[p].res<1) phases[p].res=1;
+        if(phases[p].res>32) phases[p].res=32;
+        
+        if(currentPhase===p) {
+            targetResistance = phases[p].res;
+            if(ui.res) ui.res.innerText = targetResistance;
+        }
+        refreshUI(); drawChart();
+    }
+
+    function parseData(e) {
+        const v = e.target.value;
+        const f = v.getUint16(0, true);
+        let off = 2;
+        if(!(f&1)) { document.getElementById('spdVal').innerText=(v.getUint16(off,true)*0.01).toFixed(1); off+=2; }
+        if(f&2) off+=2;
+        if(f&4) { document.getElementById('rpmVal').innerText=Math.floor(v.getUint16(off,true)*0.5); off+=2; }
+        if(f&8) off+=2;
+        if(f&16) off+=3;
+        if(f&32) { off+=2; } // Ignore feedback
+        if(f&64) document.getElementById('pwrVal').innerText=v.getInt16(off,true);
+    }
+
+    function refreshUI() {
+        let tm=0, tr=0;
+        for(let k in phases) {
+            document.getElementById(`val_res_${k}`).innerText = phases[k].res;
+            document.getElementById(`val_time_${k}`).innerText = phases[k].mins;
+            document.getElementById(`timer_${k}`).innerText = fmt(phases[k].remainingSecs);
+            tm += phases[k].mins; tr += phases[k].remainingSecs;
+        }
+        
+        // V37 Fix: Correct Timer Logic
+        if(ui.globalTimer) ui.globalTimer.innerText = fmt(tr); // Countdown
+        if(ui.totalLabel) ui.totalLabel.innerText = "Plan: " + tm + " Mins"; // Total Plan
+
+        if(currentStatus !== 'IDLE' && ui.res) {
+            ui.res.innerText = targetResistance;
+        }
+    }
+
+    function fmt(s) {
+        let m=Math.floor(s/60), sec=s%60;
+        return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+    }
+
+    function updateBtns() {
+        if(currentStatus==='IDLE') { ui.startBtn.innerText="START"; ui.startBtn.style.background="#10b981"; }
+        else if(currentStatus==='RUNNING') { ui.startBtn.innerText="PAUSE"; ui.startBtn.style.background="#f59e0b"; }
+        else { ui.startBtn.innerText="RESUME"; ui.startBtn.style.background="#10b981"; }
+    }
+
+    // --- 6. UTILS ---
+    function loadSettings() {
+        try {
+            const saved = localStorage.getItem('horizon_v33');
+            if(saved) {
+                const p = JSON.parse(saved);
+                for(let k in phases) { if(p[k]) { phases[k].mins=p[k].mins; phases[k].res=p[k].res; }}
+            }
+        } catch(e) {}
+        resetTimers();
+    }
+
+    function saveSettings() {
+        try {
+            const toSave = {};
+            for(let k in phases) toSave[k] = { mins:phases[k].mins, res:phases[k].res };
+            localStorage.setItem('horizon_v33', JSON.stringify(toSave));
+        } catch(e) {}
+    }
+
+    function factoryReset() {
+        if(!confirm("Reset?")) return;
+        localStorage.removeItem('horizon_v33');
+        phases = JSON.parse(JSON.stringify(defaultPhases));
+        resetTimers(); refreshUI(); drawChart();
+        rawLog("Reset Done.");
+    }
+
+    function resetTimers() {
+        for(let k in phases) phases[k].remainingSecs = phases[k].mins * 60;
+        refreshUI();
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    function resizeCanvas() {
+        const b = ui.canvas.parentElement;
+        const d = window.devicePixelRatio||1;
+        ui.canvas.width = b.clientWidth*d;
+        ui.canvas.height = b.clientHeight*d;
+        ui.canvas.getContext('2d').scale(d,d);
+    }
+
+    function drawChart() {
+        const ctx = ui.canvas.getContext('2d');
+        const W = ui.canvas.width / (window.devicePixelRatio||1);
+        const H = ui.canvas.height / (window.devicePixelRatio||1);
+        ctx.clearRect(0,0,W,H);
+        
+        let tm = 0; phaseOrder.forEach(k=>tm+=phases[k].mins);
+        if(tm===0) tm=1;
+
+        const padL=30, padB=20;
+        const gw=W-padL, gh=H-padB;
+        const pxM = gw/tm;
+        const pxL = gh/35;
+
+        ctx.strokeStyle="#334155"; ctx.fillStyle="#94a3b8"; ctx.font="10px monospace";
+        ctx.textAlign="right"; ctx.textBaseline="middle";
+        for(let l=0; l<=35; l+=5) {
+            let y = gh - (l*pxL);
+            ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W,y); ctx.stroke();
+            ctx.fillText(l, padL-5, y);
+        }
+
+        ctx.textAlign="center"; ctx.textBaseline="top";
+        let step = tm<=15?2:5;
+        for(let t=0; t<=tm; t+=step) {
+            let x = padL + (t*pxM);
+            ctx.fillText(t, x, gh+4);
+        }
+
+        let cx = 0;
+        phaseOrder.forEach(k=>{
+            const w = phases[k].mins*pxM;
+            const h = phases[k].res*pxL;
+            ctx.fillStyle="#475569"; ctx.fillRect(padL+cx, gh-h, w, h);
+            
+            const dur = phases[k].mins*60;
+            const elap = dur - phases[k].remainingSecs;
+            if(elap>0) {
+                ctx.fillStyle="rgba(59,130,246,0.7)";
+                ctx.fillRect(padL+cx, gh-h, (elap/dur)*w, h);
+            }
+            cx+=w;
+        });
+    }
+</script>
+</body>
+</html>
