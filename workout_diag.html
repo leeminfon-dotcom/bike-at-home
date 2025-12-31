@@ -3,27 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V41 (Buffered Direct)</title>
+    <title>Horizon V42 (Safety Boot)</title>
     
     <script>
+        // CRITICAL: Error Handler
+        window.onerror = function(msg, url, line) {
+            const el = document.getElementById('debug-console');
+            if(el) el.innerHTML += `<div style="color:red; border-bottom:1px solid #555;">CRASH: ${msg} (L${line})</div>`;
+        };
+        
         function rawLog(msg, type='info') {
             const el = document.getElementById('debug-console');
             if(el) {
                 const ln = document.createElement('div');
-                const d = new Date();
-                const ts = `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}.${d.getMilliseconds()}`;
+                const now = new Date();
+                const ts = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
                 ln.textContent = `[${ts}] ${msg}`;
                 if(type==='err') ln.className = 'log-err';
                 if(type==='tx') ln.className = 'log-tx';
                 if(type==='succ') ln.className = 'log-succ';
-                if(type==='sys') ln.className = 'log-sys';
                 el.appendChild(ln);
                 el.scrollTop = el.scrollHeight;
             }
         }
-        window.onerror = function(msg, url, line) {
-            rawLog(`CRASH: ${msg} (L${line})`, 'err');
-        };
     </script>
 
     <style>
@@ -39,9 +41,8 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Console */
         #debug-console {
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 160px;
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 150px;
             background: rgba(0,0,0,0.95); color: #ccc; border-top: 2px solid #555;
             font-size: 11px; padding: 10px; overflow-y: scroll; font-family: monospace;
             z-index: 99999; box-sizing: border-box; white-space: pre-wrap;
@@ -49,16 +50,13 @@
         .log-err { color: #ff5555; font-weight: bold; }
         .log-tx { color: #ffff55; }
         .log-succ { color: #55ff55; }
-        .log-sys { color: #00ffff; }
 
-        /* Layout */
         .app-container { display: flex; width: 100%; height: 100%; }
         
         .sidebar {
             width: 320px; background: var(--sidebar); padding: 20px; 
             display: flex; flex-direction: column; border-right: 1px solid #475569;
-            flex-shrink: 0; overflow-y: auto;
-            padding-bottom: 250px; 
+            flex-shrink: 0; overflow-y: auto; padding-bottom: 250px; 
         }
         
         .content {
@@ -73,7 +71,6 @@
             .content { width: 100%; padding-bottom: 250px; }
         }
 
-        /* UI */
         .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; width: 100%; }
         .mini-card { background: var(--surface); padding: 10px; border-radius: 12px; text-align: center; }
         .mini-val { font-size: 24px; font-weight: 800; }
@@ -109,20 +106,18 @@
         .controls-row { display: flex; gap: 10px; }
         .control-group { background: rgba(0,0,0,0.2); padding: 5px; border-radius: 8px; flex: 1; display: flex; justify-content: space-between; align-items: center; }
         .ctrl-btn { width: 30px; height: 30px; border-radius: 50%; border: none; background: #475569; color: white; }
-        
-        /* Device Info Box */
         .dev-info { font-size: 10px; color: #666; margin-bottom: 10px; word-break: break-all; }
     </style>
 </head>
 <body>
 
-<div id="debug-console">V41 Init...</div>
+<div id="debug-console">Parsing JS...</div>
 
 <div class="app-container">
     <div class="sidebar">
-        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V41</div>
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V42</div>
         <div id="btStatus" style="color:#666; margin-bottom:5px;">Disconnected</div>
-        <div id="devInfo" class="dev-info">Last: None</div>
+        <div id="devInfo" class="dev-info">Last: --</div>
 
         <div class="dash-grid">
             <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
@@ -215,7 +210,22 @@
 </div>
 
 <script>
-    // --- 1. CONFIG ---
+    // --- 0. SAFE STORAGE (The Crash Preventer) ---
+    const SafeStore = {
+        getItem: function(key) {
+            try { return localStorage.getItem(key); } catch(e) { return null; }
+        },
+        setItem: function(key, val) {
+            try { localStorage.setItem(key, val); } catch(e) { }
+        },
+        removeItem: function(key) {
+            try { localStorage.removeItem(key); } catch(e) { }
+        }
+    };
+
+    // --- 1. CONFIG & STATE ---
+    rawLog('V42 Booting...');
+    
     const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
     const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
     const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
@@ -225,13 +235,13 @@
     let currentPhase = null; 
     const phaseOrder = ['warmup', 'workout1', 'workout2', 'cooldown'];
     
-    // V41: Buffered Direct Fire Logic
+    // V41 Logic: Buffered Direct Fire
     let isWriting = false;
-    let pendingResistance = null; // Buffer for next value
-    let targetResistance = 1;     // For Keeper Loop
+    let pendingResistance = null;
+    let targetResistance = 1;
 
     let workoutInterval;
-    let keeperInterval; // V41 Keeper
+    let keeperInterval;
 
     const defaultPhases = {
         warmup:   { mins: 3,  res: 15 },
@@ -242,7 +252,7 @@
     let phases = JSON.parse(JSON.stringify(defaultPhases));
     let ui = {};
 
-    // --- 2. BOOT (V35 STYLE) ---
+    // --- 2. BOOT ---
     window.onload = function() {
         try { initApp(); } 
         catch(e) { rawLog(`INIT ERROR: ${e.message}`, 'err'); }
@@ -259,11 +269,11 @@
             res: document.getElementById('resVal')
         };
 
-        // Show Last Connected Device
-        const lastDev = localStorage.getItem('last_device_name');
-        if(lastDev) document.getElementById('devInfo').innerText = `Last: ${lastDev}`;
+        if(!ui.connectBtn) throw new Error("UI Missing");
 
-        if(!ui.connectBtn) throw new Error("UI Load Fail");
+        // Safe Storage Check
+        const lastDev = SafeStore.getItem('last_device_name');
+        if(lastDev) document.getElementById('devInfo').innerText = `Last: ${lastDev}`;
 
         safeBind('connectBtn', startScan);
         safeBind('startBtn', toggleWorkout);
@@ -281,14 +291,15 @@
 
         loadSettings();
         
-        // Init UI
-        if(currentPhase) targetResistance = phases[currentPhase].res;
+        if(currentPhase && phases[currentPhase]) {
+             if(ui.res) ui.res.innerText = phases[currentPhase].res;
+        }
         refreshUI();
 
         setTimeout(() => { resizeCanvas(); drawChart(); }, 300);
         window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
         
-        rawLog("System Ready (V41).", 'sys');
+        rawLog("System Ready (Safety Mode).", 'succ');
     }
 
     function safeBind(id, fn) {
@@ -296,7 +307,7 @@
         if(el) el.addEventListener('click', fn);
     }
 
-    // --- 3. BLUETOOTH CORE ---
+    // --- 3. BLUETOOTH ---
     async function startScan() {
         if(!navigator.bluetooth) return alert("Browser not supported");
         try {
@@ -306,13 +317,9 @@
                 optionalServices: [FTMS_UUID]
             });
             
-            rawLog(`Connecting: ${dev.name} (${dev.id})`, 'sys');
+            rawLog(`Device: ${dev.name}`);
+            SafeStore.setItem('last_device_name', dev.name);
             
-            // SAVE DEVICE INFO
-            localStorage.setItem('last_device_name', dev.name);
-            localStorage.setItem('last_device_id', dev.id);
-            document.getElementById('devInfo').innerText = `Last: ${dev.name}`;
-
             dev.addEventListener('gattserverdisconnected', onDisconnect);
             const server = await dev.gatt.connect();
             const svc = await server.getPrimaryService(FTMS_UUID);
@@ -339,18 +346,15 @@
         }
     }
 
-    // --- V41 CORE: BUFFERED DIRECT FIRE ---
+    // --- BUFFERED DIRECT FIRE ---
     async function setResistance(val) {
-        // 1. Always update UI immediately (Optimistic)
         if(ui.res) ui.res.innerText = val;
-        targetResistance = val; // For Keeper
+        targetResistance = val; 
 
         if(!controlChar) return;
 
-        // 2. Buffer Logic: If busy, overwrite pending
         if(isWriting) {
             pendingResistance = val;
-            // rawLog(`Buffered: ${val}`);
             return;
         }
 
@@ -361,11 +365,10 @@
             rawLog(`TX Fail: ${e.message}`, 'err');
         } finally {
             isWriting = false;
-            // 3. Process Buffer if exists
             if(pendingResistance !== null) {
                 const next = pendingResistance;
                 pendingResistance = null;
-                setResistance(next); // Recursive call
+                setResistance(next);
             }
         }
     }
@@ -392,7 +395,7 @@
         rawLog("Disconnected", 'err');
     }
 
-    // --- 4. WORKOUT LOGIC ---
+    // --- 4. WORKOUT ---
     function toggleWorkout() {
         if(currentStatus==='IDLE') startWorkout();
         else if(currentStatus==='RUNNING') pauseWorkout();
@@ -408,12 +411,11 @@
         currentStatus = 'RUNNING';
         updateBtns();
         
-        // Timers
         if(workoutInterval) clearInterval(workoutInterval);
         workoutInterval = setInterval(timerLoop, 1000);
         
         if(keeperInterval) clearInterval(keeperInterval);
-        keeperInterval = setInterval(keeperLoop, 3000); // 3s Heartbeat
+        keeperInterval = setInterval(keeperLoop, 3000);
 
         activatePhase(currentPhase);
         rawLog("Started.");
@@ -432,8 +434,6 @@
         updateBtns();
         workoutInterval = setInterval(timerLoop, 1000);
         keeperInterval = setInterval(keeperLoop, 3000);
-        
-        // Force Resend
         setResistance(targetResistance);
         rawLog("Resumed.");
     }
@@ -447,7 +447,7 @@
         document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
         resetTimers(); refreshUI();
         
-        setResistance(1); // Reset Bike
+        setResistance(1); 
         
         saveSettings(); drawChart();
         rawLog("Stopped.");
@@ -467,4 +467,36 @@
 
     function activatePhase(k) {
         currentPhase = k;
-        document.querySelectorAll('.phase-card').forEach(el=>el.classList.
+        document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
+        const c = document.getElementById(`card_${k}`);
+        if(c) c.classList.add('active');
+        
+        setResistance(phases[k].res);
+        rawLog(`Phase ${k} Active`);
+    }
+
+    function timerLoop() {
+        if(!currentPhase) return;
+        if(phases[currentPhase].remainingSecs > 0) phases[currentPhase].remainingSecs--;
+        else {
+            let idx = phaseOrder.indexOf(currentPhase);
+            if(idx < phaseOrder.length - 1) activatePhase(phaseOrder[idx+1]);
+            else { stopWorkout(); alert("Finished!"); }
+        }
+        refreshUI(); drawChart();
+    }
+
+    function keeperLoop() {
+        if(currentStatus === 'RUNNING' && !isWriting) {
+            sendResInternal(targetResistance).catch(()=>{});
+        }
+    }
+
+    // --- 5. DATA ---
+    function adjTime(p, d) {
+        if(phases[p].mins+d < 1) return;
+        phases[p].mins += d;
+        if(currentStatus==='IDLE' || currentPhase!==p) phases[p].remainingSecs = phases[p].mins*60;
+        else {
+            phases[p].remainingSecs += (d*60);
+            if(phases[p].remainingSecs < 0) phases
