@@ -3,8 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V34 (Fixed)</title>
+    <title>Horizon V35 (Bug Fix & Log)</title>
     
+    <script>
+        function rawLog(msg, type='info') {
+            const el = document.getElementById('debug-console');
+            if(el) {
+                const ln = document.createElement('div');
+                const ts = new Date().toLocaleTimeString().split(' ')[0];
+                ln.textContent = `[${ts}] ${msg}`;
+                if(type==='err') ln.className = 'log-err';
+                if(type==='tx') ln.className = 'log-tx';
+                if(type==='succ') ln.className = 'log-succ';
+                el.appendChild(ln);
+                el.scrollTop = el.scrollHeight;
+            }
+        }
+        window.onerror = function(msg, url, line) {
+            rawLog(`CRASH: ${msg} (L${line})`, 'err');
+        };
+    </script>
+
     <style>
         :root {
             --bg: #0f172a; --sidebar: #1e293b; --surface: #334155;
@@ -18,18 +37,19 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Console styling (Always on top) */
+        /* Console */
         #debug-console {
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 120px;
-            background: rgba(0,0,0,0.95); color: #00ff00; border-top: 2px solid #666;
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 160px;
+            background: rgba(0,0,0,0.95); color: #ccc; border-top: 2px solid #555;
             font-size: 11px; padding: 10px; overflow-y: scroll; font-family: monospace;
             z-index: 99999; box-sizing: border-box; white-space: pre-wrap;
         }
-        .log-err { color: #ff3333; font-weight: bold; border-bottom: 1px solid #ff3333; }
-        .log-step { color: #ffff00; }
+        .log-err { color: #ff5555; font-weight: bold; }
+        .log-tx { color: #ffff55; } /* Yellow for sending */
+        .log-succ { color: #55ff55; } /* Green for success */
 
         /* Layout */
-        .app-container { display: flex; width: 100%; height: 100%; padding-bottom: 120px; }
+        .app-container { display: flex; width: 100%; height: 100%; padding-bottom: 160px; }
         .sidebar {
             width: 320px; background: var(--sidebar); padding: 20px; 
             display: flex; flex-direction: column; border-right: 1px solid #475569;
@@ -81,32 +101,14 @@
         .control-group { background: rgba(0,0,0,0.2); padding: 5px; border-radius: 8px; flex: 1; display: flex; justify-content: space-between; align-items: center; }
         .ctrl-btn { width: 30px; height: 30px; border-radius: 50%; border: none; background: #475569; color: white; }
     </style>
-    
-    <script>
-        function rawLog(msg, type='info') {
-            const el = document.getElementById('debug-console');
-            if(el) {
-                const ln = document.createElement('div');
-                ln.textContent = `> ${msg}`;
-                if(type==='err') ln.className = 'log-err';
-                if(type==='step') ln.className = 'log-step';
-                el.appendChild(ln);
-                el.scrollTop = el.scrollHeight;
-            }
-        }
-        window.onerror = function(msg, url, line) {
-            rawLog(`CRASH: ${msg} (Line ${line})`, 'err');
-            document.body.style.backgroundColor = '#330000'; // Visual Fail
-        };
-    </script>
 </head>
 <body>
 
-<div id="debug-console">Waiting for JS...</div>
+<div id="debug-console">V35 Init...</div>
 
 <div class="app-container">
     <div class="sidebar">
-        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V34</div>
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35</div>
         <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
 
         <div class="dash-grid">
@@ -129,7 +131,7 @@
     <div class="content">
         <div class="chart-box"><canvas id="workoutChart"></canvas></div>
         <div id="globalTimer" class="global-timer">00:00</div>
-        <div style="color:#666; margin-bottom:20px;">Total Time</div>
+        <div id="totalLabel" style="color:#666; margin-bottom:20px;">Total Time</div>
 
         <div class="phase-list">
             <div id="card_warmup" class="phase-card">
@@ -200,9 +202,7 @@
 </div>
 
 <script>
-    // --- STEP 1: GLOBAL VARS ---
-    rawLog('Step 1: Globals defining...', 'step');
-    
+    // --- 1. CONFIG & STATE ---
     const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
     const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
     const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
@@ -212,9 +212,9 @@
     let currentPhase = null; 
     const phaseOrder = ['warmup', 'workout1', 'workout2', 'cooldown'];
     
-    // Sync Loop
+    // Traffic Control
     let targetResistance = 1; 
-    let sentResistance = -1;  
+    let sentResistance = -99; // Force send on start
     let isWriting = false;    
     let syncInterval = null;
     let workoutInterval;
@@ -228,33 +228,25 @@
     let phases = JSON.parse(JSON.stringify(defaultPhases));
     let ui = {};
 
-    // --- STEP 2: MAIN ENTRY ---
+    // --- 2. STARTUP ---
     window.onload = function() {
-        rawLog('Step 2: Window Loaded. Starting Init...', 'step');
-        try {
-            initApp();
-        } catch(e) {
-            rawLog(`INIT FATAL: ${e.message}`, 'err');
-            console.error(e);
-        }
+        try { initApp(); } 
+        catch(e) { rawLog(`INIT ERROR: ${e.message}`, 'err'); }
     };
 
     function initApp() {
-        // Map UI
-        rawLog('Step 3: Mapping UI...');
         ui = {
             btStatus: document.getElementById('btStatus'),
             connectBtn: document.getElementById('connectBtn'),
             startBtn: document.getElementById('startBtn'),
             canvas: document.getElementById('workoutChart'),
-            res: document.getElementById('resVal'),
-            totalLabel: document.getElementById('globalTimer')
+            totalLabel: document.getElementById('totalLabel'), // Fixed mapping
+            res: document.getElementById('resVal')
         };
 
-        if(!ui.connectBtn) throw new Error("Missing connectBtn");
+        if(!ui.connectBtn) throw new Error("UI Load Fail");
 
-        // Bindings
-        rawLog('Step 4: Binding Events...');
+        // Event Binding
         safeBind('connectBtn', startScan);
         safeBind('startBtn', toggleWorkout);
         safeBind('stopBtn', stopWorkout);
@@ -269,39 +261,274 @@
             safeBind(`btn_${key}_time_plus`, () => adjTime(key, 1));
         });
 
-        // Load & Render
-        rawLog('Step 5: Loading Data...');
         loadSettings();
         refreshUI();
         
-        // Start Sync
-        rawLog('Step 6: Starting Sync Loop...');
+        // Start Sync Loop (Always running to catch manual changes)
         if(syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(bleSyncLoop, 250);
 
-        // Chart
         setTimeout(() => { resizeCanvas(); drawChart(); }, 300);
         window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
-
-        rawLog('>>> SYSTEM READY. PRESS CONNECT. <<<', 'step');
+        
+        rawLog("System Ready.");
     }
 
     function safeBind(id, fn) {
         const el = document.getElementById(id);
         if(el) el.addEventListener('click', fn);
-        else rawLog(`WARN: Button ${id} missing`, 'err');
     }
 
-    // --- LOGIC ---
+    // --- 3. BLUETOOTH CORE ---
+    async function startScan() {
+        if(!navigator.bluetooth) return alert("Browser not supported");
+        try {
+            ui.connectBtn.innerText = "Scanning...";
+            const dev = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true, 
+                optionalServices: [FTMS_UUID]
+            });
+            
+            rawLog(`Device: ${dev.name} (${dev.id})`);
+            
+            // Store Connection Info
+            localStorage.setItem('last_device_name', dev.name);
+            localStorage.setItem('last_device_id', dev.id);
+
+            dev.addEventListener('gattserverdisconnected', onDisconnect);
+            const server = await dev.gatt.connect();
+            const svc = await server.getPrimaryService(FTMS_UUID);
+            controlChar = await svc.getCharacteristic(CTRL_UUID);
+            const dataChar = await svc.getCharacteristic(DATA_UUID);
+            
+            await dataChar.startNotifications();
+            dataChar.addEventListener('characteristicvaluechanged', parseData);
+
+            // Handshake Sequence (Slower for reliability)
+            rawLog("Handshake: Request Control...", 'tx');
+            await sendHexDirect(0x00); 
+            await sleep(200); 
+            
+            rawLog("Handshake: Start/Resume...", 'tx');
+            await sendHexDirect(0x07);
+            await sleep(200);
+
+            ui.btStatus.innerText = "Connected: " + dev.name;
+            ui.btStatus.style.color = "#3b82f6";
+            ui.connectBtn.style.display = 'none';
+            rawLog("Connected!", 'succ');
+            
+        } catch(e) {
+            ui.connectBtn.innerText = "Connect";
+            rawLog(`Connect Fail: ${e.message}`, 'err');
+        }
+    }
+
+    // Traffic Control Loop
+    async function bleSyncLoop() {
+        if(!controlChar || isWriting) return;
+        
+        // If Logic mismatch
+        if(targetResistance !== sentResistance) {
+            isWriting = true;
+            try {
+                rawLog(`TX Level: ${targetResistance}...`, 'tx');
+                
+                const buf = new ArrayBuffer(3);
+                const v = new DataView(buf);
+                v.setUint8(0, 0x04); // Set Resistance OpCode
+                v.setUint16(1, targetResistance * 10, true); // Unit 0.1
+                
+                await controlChar.writeValue(buf);
+                
+                sentResistance = targetResistance;
+                rawLog(`TX Success: Lvl ${targetResistance}`, 'succ');
+                
+            } catch(e) {
+                rawLog(`TX Busy/Fail: ${e.message}`, 'err');
+            } finally {
+                isWriting = false;
+            }
+        }
+    }
+    
+    async function sendHexDirect(b) {
+        if(controlChar) await controlChar.writeValue(new Uint8Array([b])).catch(e=>rawLog("HexErr:"+e));
+    }
+    
+    function onDisconnect() {
+        ui.btStatus.innerText = "Disconnected";
+        ui.btStatus.style.color = "#666";
+        ui.connectBtn.style.display = 'block';
+        if(currentStatus!=='IDLE') stopWorkout();
+        rawLog("Device Disconnected", 'err');
+    }
+
+    // --- 4. WORKOUT LOGIC ---
+    function toggleWorkout() {
+        if(currentStatus==='IDLE') startWorkout();
+        else if(currentStatus==='RUNNING') pauseWorkout();
+        else resumeWorkout();
+    }
+
+    function startWorkout() {
+        saveSettings();
+        if(!controlChar) rawLog("Demo Mode (No Device)", 'err');
+        
+        sendHexDirect(0x07); // Ensure Wake
+        
+        if(!currentPhase) currentPhase = 'warmup';
+        currentStatus = 'RUNNING';
+        updateBtns();
+        
+        if(workoutInterval) clearInterval(workoutInterval);
+        workoutInterval = setInterval(timerLoop, 1000);
+        
+        activatePhase(currentPhase);
+        rawLog("Workout Started.");
+    }
+
+    function pauseWorkout() {
+        currentStatus = 'PAUSED';
+        clearInterval(workoutInterval);
+        updateBtns();
+        rawLog("Paused.");
+    }
+
+    function resumeWorkout() {
+        currentStatus = 'RUNNING';
+        updateBtns();
+        workoutInterval = setInterval(timerLoop, 1000);
+        sentResistance = -99; // Force resend on resume
+        rawLog("Resumed.");
+    }
+
+    function stopWorkout() {
+        currentStatus = 'IDLE';
+        currentPhase = null;
+        clearInterval(workoutInterval);
+        updateBtns();
+        document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
+        resetTimers(); refreshUI();
+        
+        // Reset Bike
+        targetResistance = 1; 
+        
+        saveSettings(); drawChart();
+        rawLog("Stopped.");
+    }
+
+    function jumpPhase(dir) {
+        let idx = phaseOrder.indexOf(currentPhase||'warmup');
+        if(dir==='next') idx++; else idx--;
+        if(idx<0 || idx>=phaseOrder.length) return rawLog("Limit Reached");
+        
+        const k = phaseOrder[idx];
+        phases[k].remainingSecs = phases[k].mins*60;
+        activatePhase(k);
+        refreshUI(); drawChart();
+        rawLog(`Jump > ${k}`);
+    }
+
+    function activatePhase(k) {
+        currentPhase = k;
+        document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
+        const c = document.getElementById(`card_${k}`);
+        if(c) c.classList.add('active');
+        
+        // CRITICAL FIX: Force resend even if level is same
+        sentResistance = -99; 
+        targetResistance = phases[k].res;
+        
+        rawLog(`Phase ${k} Active. Target: ${targetResistance}`);
+    }
+
+    function timerLoop() {
+        if(!currentPhase) return;
+        if(phases[currentPhase].remainingSecs > 0) phases[currentPhase].remainingSecs--;
+        else {
+            let idx = phaseOrder.indexOf(currentPhase);
+            if(idx < phaseOrder.length - 1) activatePhase(phaseOrder[idx+1]);
+            else { stopWorkout(); alert("Workout Finished!"); }
+        }
+        refreshUI(); drawChart();
+    }
+
+    // --- 5. DATA & UI ---
+    function adjTime(p, d) {
+        if(phases[p].mins+d < 1) return;
+        phases[p].mins += d;
+        if(currentStatus==='IDLE' || currentPhase!==p) phases[p].remainingSecs = phases[p].mins*60;
+        else {
+            phases[p].remainingSecs += (d*60);
+            if(phases[p].remainingSecs < 0) phases[p].remainingSecs = 0;
+        }
+        refreshUI(); drawChart();
+    }
+
+    function adjRes(p, d) {
+        phases[p].res += d;
+        if(phases[p].res<1) phases[p].res=1;
+        if(phases[p].res>32) phases[p].res=32;
+        
+        // Only update target immediately if this is the active phase
+        if(currentPhase===p) {
+            targetResistance = phases[p].res;
+            rawLog(`User Adj: Target ${targetResistance}`);
+        }
+        refreshUI(); drawChart();
+    }
+
+    function parseData(e) {
+        const v = e.target.value;
+        const f = v.getUint16(0, true);
+        let off = 2;
+        if(!(f&1)) { document.getElementById('spdVal').innerText=(v.getUint16(off,true)*0.01).toFixed(1); off+=2; }
+        if(f&2) off+=2;
+        if(f&4) { document.getElementById('rpmVal').innerText=Math.floor(v.getUint16(off,true)*0.5); off+=2; }
+        if(f&8) off+=2;
+        if(f&16) off+=3;
+        if(f&32) {
+            // Resistance from bike (feedback)
+            // const r = v.getInt16(off,true);
+            // We ignore updating UI from bike to avoid fighting with user input
+            off+=2;
+        }
+        if(f&64) document.getElementById('pwrVal').innerText=v.getInt16(off,true);
+    }
+
+    function refreshUI() {
+        let tm=0, tr=0;
+        for(let k in phases) {
+            document.getElementById(`val_res_${k}`).innerText = phases[k].res;
+            document.getElementById(`val_time_${k}`).innerText = phases[k].mins;
+            document.getElementById(`timer_${k}`).innerText = fmt(phases[k].remainingSecs);
+            tm += phases[k].mins; tr += phases[k].remainingSecs;
+        }
+        if(ui.totalLabel) ui.totalLabel.innerText = "Total: " + fmt(tr);
+    }
+
+    function fmt(s) {
+        let m=Math.floor(s/60), sec=s%60;
+        return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+    }
+
+    function updateBtns() {
+        if(currentStatus==='IDLE') { ui.startBtn.innerText="START"; ui.startBtn.style.background="#10b981"; }
+        else if(currentStatus==='RUNNING') { ui.startBtn.innerText="PAUSE"; ui.startBtn.style.background="#f59e0b"; }
+        else { ui.startBtn.innerText="RESUME"; ui.startBtn.style.background="#10b981"; }
+    }
+
+    // --- 6. UTILS ---
     function loadSettings() {
         try {
             const saved = localStorage.getItem('horizon_v33');
             if(saved) {
                 const p = JSON.parse(saved);
                 for(let k in phases) { if(p[k]) { phases[k].mins=p[k].mins; phases[k].res=p[k].res; }}
-                rawLog("Settings restored.");
+                rawLog("Settings Restored.");
             }
-        } catch(e) { rawLog("Storage error (Private mode?)", 'err'); }
+        } catch(e) {}
         resetTimers();
     }
 
@@ -321,219 +548,12 @@
         rawLog("Reset Done.");
     }
 
-    // --- THE MISSING LINK (RESTORED) ---
     function resetTimers() {
         for(let k in phases) phases[k].remainingSecs = phases[k].mins * 60;
-        updateTotalLabel(); // This was causing the crash
+        refreshUI();
     }
 
-    function updateTotalLabel() {
-        let tm = 0, tr = 0;
-        for(let k in phases) {
-            tm += phases[k].mins;
-            tr += phases[k].remainingSecs;
-        }
-        if(ui.totalLabel) ui.totalLabel.innerText = fmt(tr);
-    }
-    // -----------------------------------
-
-    // --- BLE ---
-    async function startScan() {
-        if(!navigator.bluetooth) return alert("No WebBluetooth");
-        try {
-            ui.connectBtn.innerText = "Scanning...";
-            const dev = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true, optionalServices: [FTMS_UUID]
-            });
-            dev.addEventListener('gattserverdisconnected', onDisconnect);
-            const server = await dev.gatt.connect();
-            const svc = await server.getPrimaryService(FTMS_UUID);
-            controlChar = await svc.getCharacteristic(CTRL_UUID);
-            const dataChar = await svc.getCharacteristic(DATA_UUID);
-            
-            await dataChar.startNotifications();
-            dataChar.addEventListener('characteristicvaluechanged', parseData);
-
-            await sendHexNow(0x00);
-            await sendHexNow(0x07);
-
-            ui.btStatus.innerText = "Connected";
-            ui.btStatus.style.color = "#3b82f6";
-            ui.connectBtn.style.display = 'none';
-            rawLog("Connected!");
-        } catch(e) {
-            ui.connectBtn.innerText = "Connect";
-            rawLog(`Connect Fail: ${e.message}`, 'err');
-            alert(e.message);
-        }
-    }
-
-    function onDisconnect() {
-        ui.btStatus.innerText = "Disconnected";
-        ui.btStatus.style.color = "#666";
-        ui.connectBtn.style.display = 'block';
-        if(currentStatus!=='IDLE') stopWorkout();
-        rawLog("Disconnected");
-    }
-
-    // --- SYNC LOOP ---
-    async function bleSyncLoop() {
-        if(!controlChar || isWriting) return;
-        if(targetResistance !== sentResistance) {
-            isWriting = true;
-            try {
-                const buf = new ArrayBuffer(3);
-                const v = new DataView(buf);
-                v.setUint8(0, 0x04);
-                v.setUint16(1, targetResistance * 10, true);
-                await controlChar.writeValue(buf);
-                sentResistance = targetResistance;
-            } catch(e) { console.log("Busy"); }
-            isWriting = false;
-        }
-    }
-    
-    async function sendHexNow(b) {
-        if(controlChar) await controlChar.writeValue(new Uint8Array([b])).catch(()=>{});
-    }
-
-    // --- CONTROLS ---
-    function toggleWorkout() {
-        if(currentStatus==='IDLE') startWorkout();
-        else if(currentStatus==='RUNNING') pauseWorkout();
-        else resumeWorkout();
-    }
-
-    function startWorkout() {
-        saveSettings();
-        sendHexNow(0x07);
-        if(!currentPhase) currentPhase = 'warmup';
-        currentStatus = 'RUNNING';
-        updateBtns();
-        if(workoutInterval) clearInterval(workoutInterval);
-        workoutInterval = setInterval(timerLoop, 1000);
-        activatePhase(currentPhase);
-        rawLog("Started.");
-    }
-
-    function pauseWorkout() {
-        currentStatus = 'PAUSED';
-        clearInterval(workoutInterval);
-        updateBtns();
-        rawLog("Paused.");
-    }
-
-    function resumeWorkout() {
-        currentStatus = 'RUNNING';
-        updateBtns();
-        workoutInterval = setInterval(timerLoop, 1000);
-        sentResistance = -1; // Force Sync
-        rawLog("Resumed.");
-    }
-
-    function stopWorkout() {
-        currentStatus = 'IDLE';
-        currentPhase = null;
-        clearInterval(workoutInterval);
-        updateBtns();
-        document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
-        resetTimers(); refreshUI();
-        targetResistance = 1;
-        saveSettings(); drawChart();
-        rawLog("Stopped.");
-    }
-
-    function jumpPhase(dir) {
-        let idx = phaseOrder.indexOf(currentPhase||'warmup');
-        if(dir==='next') idx++; else idx--;
-        if(idx<0 || idx>=phaseOrder.length) return rawLog("No phase");
-        const k = phaseOrder[idx];
-        phases[k].remainingSecs = phases[k].mins*60;
-        activatePhase(k);
-        refreshUI(); drawChart();
-        rawLog(`Jump > ${k}`);
-    }
-
-    function activatePhase(k) {
-        currentPhase = k;
-        document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
-        const c = document.getElementById(`card_${k}`);
-        if(c) c.classList.add('active');
-        targetResistance = phases[k].res;
-        rawLog(`Phase ${k} active. Target ${targetResistance}`);
-    }
-
-    function updateBtns() {
-        if(currentStatus==='IDLE') { ui.startBtn.innerText="START"; ui.startBtn.style.background="#10b981"; }
-        else if(currentStatus==='RUNNING') { ui.startBtn.innerText="PAUSE"; ui.startBtn.style.background="#f59e0b"; }
-        else { ui.startBtn.innerText="RESUME"; ui.startBtn.style.background="#10b981"; }
-    }
-
-    function timerLoop() {
-        if(!currentPhase) return;
-        if(phases[currentPhase].remainingSecs > 0) phases[currentPhase].remainingSecs--;
-        else {
-            let idx = phaseOrder.indexOf(currentPhase);
-            if(idx < phaseOrder.length - 1) activatePhase(phaseOrder[idx+1]);
-            else { stopWorkout(); alert("Done!"); }
-        }
-        refreshUI(); drawChart();
-    }
-
-    // --- ADJ ---
-    function adjTime(p, d) {
-        if(phases[p].mins+d < 1) return;
-        phases[p].mins += d;
-        if(currentStatus==='IDLE' || currentPhase!==p) phases[p].remainingSecs = phases[p].mins*60;
-        else {
-            phases[p].remainingSecs += (d*60);
-            if(phases[p].remainingSecs < 0) phases[p].remainingSecs = 0;
-        }
-        refreshUI(); drawChart();
-    }
-
-    function adjRes(p, d) {
-        phases[p].res += d;
-        if(phases[p].res<1) phases[p].res=1;
-        if(phases[p].res>32) phases[p].res=32;
-        if(currentPhase===p) targetResistance = phases[p].res;
-        refreshUI(); drawChart();
-    }
-
-    function parseData(e) {
-        const v = e.target.value;
-        const f = v.getUint16(0, true);
-        let off = 2;
-        if(!(f&1)) { document.getElementById('spdVal').innerText=(v.getUint16(off,true)*0.01).toFixed(1); off+=2; }
-        if(f&2) off+=2;
-        if(f&4) { document.getElementById('rpmVal').innerText=Math.floor(v.getUint16(off,true)*0.5); off+=2; }
-        if(f&8) off+=2;
-        if(f&16) off+=3;
-        if(f&32) {
-            const r = v.getInt16(off,true);
-            if(r>0 && ui.res && (Date.now() - 0 > 3000)) { 
-                // Only update visual if needed, currently rely on plan
-            }
-            off+=2;
-        }
-        if(f&64) document.getElementById('pwrVal').innerText=v.getInt16(off,true);
-    }
-
-    function refreshUI() {
-        let tr=0;
-        for(let k in phases) {
-            document.getElementById(`val_res_${k}`).innerText = phases[k].res;
-            document.getElementById(`val_time_${k}`).innerText = phases[k].mins;
-            document.getElementById(`timer_${k}`).innerText = fmt(phases[k].remainingSecs);
-            tr += phases[k].remainingSecs;
-        }
-        updateTotalLabel();
-    }
-
-    function fmt(s) {
-        let m=Math.floor(s/60), sec=s%60;
-        return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
-    }
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
     function resizeCanvas() {
         const b = ui.canvas.parentElement;
@@ -549,8 +569,7 @@
         const H = ui.canvas.height / (window.devicePixelRatio||1);
         ctx.clearRect(0,0,W,H);
         
-        let tm = 0; 
-        phaseOrder.forEach(k=>tm+=phases[k].mins);
+        let tm = 0; phaseOrder.forEach(k=>tm+=phases[k].mins);
         if(tm===0) tm=1;
 
         const padL=30, padB=20;
@@ -578,11 +597,8 @@
         phaseOrder.forEach(k=>{
             const w = phases[k].mins*pxM;
             const h = phases[k].res*pxL;
-            // Plan
-            ctx.fillStyle="#475569";
-            ctx.fillRect(padL+cx, gh-h, w, h);
+            ctx.fillStyle="#475569"; ctx.fillRect(padL+cx, gh-h, w, h);
             
-            // Progress
             const dur = phases[k].mins*60;
             const elap = dur - phases[k].remainingSecs;
             if(elap>0) {
@@ -592,8 +608,6 @@
             cx+=w;
         });
     }
-
-    rawLog('Step 1.5: Vars Ready.', 'step');
 </script>
 </body>
 </html>
