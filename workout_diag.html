@@ -3,7 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V31 (Sync Loop)</title>
+    <title>Horizon V32 (Bulletproof)</title>
+    
+    <script>
+        window.onerror = function(msg, url, line) {
+            const errBox = document.getElementById('sys-error');
+            if(errBox) {
+                errBox.style.display = 'block';
+                errBox.innerHTML += `<div>CRASH: ${msg} (Line ${line})</div>`;
+            }
+            // Also try to log to console div if it exists
+            const logBox = document.getElementById('console-log');
+            if(logBox) logBox.innerHTML += `<div style="color:red">SYS ERROR: ${msg}</div>`;
+        };
+    </script>
+
     <style>
         :root {
             --bg: #0f172a; --sidebar: #1e293b; --surface: #334155;
@@ -23,13 +37,13 @@
         .sidebar {
             width: 320px; background: var(--sidebar); padding: 20px; 
             display: flex; flex-direction: column; border-right: 1px solid #475569;
-            flex-shrink: 0; overflow-y: auto; z-index: 10; padding-bottom: 150px;
+            flex-shrink: 0; overflow-y: auto; z-index: 10; padding-bottom: 160px;
         }
 
         .content {
             flex: 1; padding: 20px; overflow-y: auto; position: relative;
             display: flex; flex-direction: column; align-items: center;
-            -webkit-overflow-scrolling: touch; padding-bottom: 150px;
+            -webkit-overflow-scrolling: touch; padding-bottom: 160px;
         }
 
         @media (max-width: 820px) {
@@ -105,7 +119,7 @@
         .ctrl-lbl { font-size: 9px; color: #aaa; text-align:center; display: block;}
         .col-center { display:flex; flex-direction:column; align-items:center; }
 
-        /* --- DEBUG CONSOLE --- */
+        /* --- DEBUG CONSOLE (FIXED) --- */
         #console-log {
             position: fixed; bottom: 0; left: 0; width: 100%; height: 120px;
             background: rgba(0,0,0,0.95); color: #0f0; border-top: 2px solid #555;
@@ -126,7 +140,7 @@
 <div class="app-container">
     <div class="sidebar">
         <div>
-            <div class="brand">HORIZON V31</div>
+            <div class="brand">HORIZON V32</div>
             <div id="btStatus" class="bt-status">Disconnected</div>
         </div>
 
@@ -225,7 +239,7 @@
 <div id="console-log">Initializing...</div>
 
 <script>
-    // --- 0. Logging ---
+    // --- 0. Logging & Error System ---
     const logBox = document.getElementById('console-log');
     const errBox = document.getElementById('sys-error');
     
@@ -238,16 +252,8 @@
         }
         console.log(msg);
     }
-    
-    window.onerror = function(msg, url, line) {
-        if(errBox) {
-            errBox.style.display = 'block';
-            errBox.innerHTML += `<div>CRASH: ${msg} (Line ${line})</div>`;
-        }
-        log(`CRASH: ${msg} line ${line}`);
-    };
 
-    // --- 1. Variables & Config ---
+    // --- 1. Variables ---
     const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
     const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
     const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
@@ -257,12 +263,11 @@
     let currentPhase = null; 
     const phaseOrder = ['warmup', 'workout1', 'workout2', 'cooldown'];
     
-    // -- NEW: SYNC LOOP VARIABLES --
-    let targetResistance = 1; // User wants this
-    let sentResistance = -1;  // Bike has this
-    let isWriting = false;    // Bluetooth busy flag
-    let syncInterval = null;  // The heartbeat loop
-    // -------------------------------
+    // Sync Loop Variables
+    let targetResistance = 1; 
+    let sentResistance = -1;  
+    let isWriting = false;    
+    let syncInterval = null;  
 
     let workoutInterval;
     let lastCmdTime = 0;
@@ -276,30 +281,112 @@
     let phases = JSON.parse(JSON.stringify(defaultPhases));
     let ui = {};
 
-    // --- 2. Init ---
-    window.addEventListener('DOMContentLoaded', () => { init(); });
-
+    // --- 2. Main Init Function ---
     function init() {
-        log("Booting V31 (Sync Loop)...");
+        try {
+            log("Booting V32 (Direct Exec)...");
 
-        ui = {
-            rpm: document.getElementById('rpmVal'),
-            pwr: document.getElementById('pwrVal'),
-            spd: document.getElementById('spdVal'),
-            res: document.getElementById('resVal'),
-            btStatus: document.getElementById('btStatus'),
-            startBtn: document.getElementById('startBtn'),
-            connectBtn: document.getElementById('connectBtn'),
-            globalTimer: document.getElementById('globalTimer'),
-            totalLabel: document.getElementById('totalLabel'),
-            canvas: document.getElementById('workoutChart')
-        };
+            // UI Refs
+            ui = {
+                rpm: document.getElementById('rpmVal'),
+                pwr: document.getElementById('pwrVal'),
+                spd: document.getElementById('spdVal'),
+                res: document.getElementById('resVal'),
+                btStatus: document.getElementById('btStatus'),
+                startBtn: document.getElementById('startBtn'),
+                connectBtn: document.getElementById('connectBtn'),
+                globalTimer: document.getElementById('globalTimer'),
+                totalLabel: document.getElementById('totalLabel'),
+                canvas: document.getElementById('workoutChart')
+            };
 
-        safeBind('connectBtn', startScan);
-        safeBind('startBtn', toggleWorkout);
-        safeBind('stopBtn', stopWorkout);
-        safeBind('resetBtn', factoryReset);
-        safeBind('prevBtn', () => jumpPhase('prev'));
-        safeBind('nextBtn', () => jumpPhase('next'));
+            // Safe Bindings
+            safeBind('connectBtn', startScan);
+            safeBind('startBtn', toggleWorkout);
+            safeBind('stopBtn', stopWorkout);
+            safeBind('resetBtn', factoryReset);
+            safeBind('prevBtn', () => jumpPhase('prev'));
+            safeBind('nextBtn', () => jumpPhase('next'));
 
-        ['warmup', 'workout1', 'workout2
+            ['warmup', 'workout1', 'workout2', 'cooldown'].forEach(key => {
+                safeBind(`btn_${key}_res_minus`, () => adjRes(key, -1));
+                safeBind(`btn_${key}_res_plus`, () => adjRes(key, 1));
+                safeBind(`btn_${key}_time_minus`, () => adjTime(key, -1));
+                safeBind(`btn_${key}_time_plus`, () => adjTime(key, 1));
+            });
+
+            loadSettings();
+            refreshUI();
+            
+            // Sync Loop Start
+            if(syncInterval) clearInterval(syncInterval);
+            syncInterval = setInterval(bleSyncLoop, 250);
+
+            // Chart
+            setTimeout(() => { resizeCanvas(); drawChart(); }, 300);
+            window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
+
+            log("System Ready.");
+
+        } catch(e) {
+            if(errBox) {
+                errBox.style.display = 'block';
+                errBox.innerHTML = `INIT FAIL: ${e.message}`;
+            }
+        }
+    }
+
+    function safeBind(id, func) {
+        const el = document.getElementById(id);
+        if(el) el.addEventListener('click', func);
+        else log(`Warn: Missing UI ID '${id}'`);
+    }
+
+    // --- 3. Persistence ---
+    function loadSettings() {
+        try {
+            const saved = localStorage.getItem('horizon_config_v26');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                for(let k in phases) {
+                    if(parsed[k]) { phases[k].mins = parsed[k].mins; phases[k].res = parsed[k].res; }
+                }
+                log("Settings loaded.");
+            }
+        } catch(e) {}
+        resetTimers();
+    }
+
+    function saveSettings() {
+        try {
+            const toSave = {};
+            for(let k in phases) toSave[k] = { mins: phases[k].mins, res: phases[k].res };
+            localStorage.setItem('horizon_config_v26', JSON.stringify(toSave));
+        } catch(e) {}
+    }
+
+    function factoryReset() {
+        if(!confirm("Reset?")) return;
+        localStorage.removeItem('horizon_config_v26');
+        phases = JSON.parse(JSON.stringify(defaultPhases));
+        resetTimers(); refreshUI(); drawChart();
+        log("Factory Reset Done.");
+    }
+
+    function resetTimers() {
+        for(let k in phases) phases[k].remainingSecs = phases[k].mins * 60;
+        updateTotalLabel();
+    }
+
+    // --- 4. Bluetooth ---
+    async function startScan() {
+        if (!navigator.bluetooth) return alert("Web Bluetooth Not Supported");
+        
+        try {
+            ui.connectBtn.innerText = "Scanning...";
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true, optionalServices: [FTMS_UUID] 
+            });
+            
+            device.addEventListener('gattserverdisconnected', onDisconnect);
+            const server
