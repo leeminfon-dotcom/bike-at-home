@@ -3,8 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V37 (V35 Polished)</title>
+    <title>Horizon V38 (Direct Boot)</title>
     
+    <script>
+        // Global Error Handler
+        window.onerror = function(msg, url, line) {
+            const el = document.getElementById('debug-console');
+            if(el) {
+                el.innerHTML += `<div style="color:red; border-bottom:1px solid #555;">CRASH: ${msg} (Line ${line})</div>`;
+            }
+        };
+        
+        function rawLog(msg, type='info') {
+            const el = document.getElementById('debug-console');
+            if(el) {
+                const ln = document.createElement('div');
+                const ts = new Date().toLocaleTimeString().split(' ')[0];
+                ln.textContent = `[${ts}] ${msg}`;
+                if(type==='err') ln.style.color = '#ff5555';
+                if(type==='tx') ln.style.color = '#ffff55';
+                if(type==='succ') ln.style.color = '#55ff55';
+                el.appendChild(ln);
+                el.scrollTop = el.scrollHeight;
+            }
+        }
+    </script>
+
     <style>
         :root {
             --bg: #0f172a; --sidebar: #1e293b; --surface: #334155;
@@ -25,24 +49,21 @@
             font-size: 11px; padding: 10px; overflow-y: scroll; font-family: monospace;
             z-index: 99999; box-sizing: border-box; white-space: pre-wrap;
         }
-        .log-err { color: #ff5555; font-weight: bold; }
-        .log-tx { color: #ffff55; }
-        .log-succ { color: #55ff55; }
 
-        /* Layout Fix: Increased padding to prevent overlap */
+        /* Layout */
         .app-container { display: flex; width: 100%; height: 100%; }
         
         .sidebar {
             width: 320px; background: var(--sidebar); padding: 20px; 
             display: flex; flex-direction: column; border-right: 1px solid #475569;
             flex-shrink: 0; overflow-y: auto;
-            padding-bottom: 250px; /* Fix: Space for console */
+            padding-bottom: 250px; /* Space for console */
         }
         
         .content {
             flex: 1; padding: 20px; overflow-y: auto; position: relative;
             display: flex; flex-direction: column; align-items: center;
-            padding-bottom: 250px; /* Fix: Space for console */
+            padding-bottom: 250px; /* Space for console */
         }
 
         @media (max-width: 820px) {
@@ -73,15 +94,13 @@
         .chart-box {
             width: 100%; max-width: 600px; height: 200px; 
             background: #1e293b; border-radius: 12px; margin-bottom: 20px;
-            flex-shrink: 0; /* Prevent shrinking */
+            flex-shrink: 0;
         }
         canvas { width: 100%; height: 100%; display: block; }
 
         .global-timer { font-size: 48px; font-weight: bold; margin-bottom: 5px; }
         
-        /* Ensure list doesn't collapse */
         .phase-list { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
-        
         .phase-card { background: #1e293b; padding: 15px; border-radius: 12px; border: 1px solid #334155; }
         .phase-card.active { border-color: var(--primary); background: #17253d; }
         .phase-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; }
@@ -93,11 +112,11 @@
 </head>
 <body>
 
-<div id="debug-console">V37 Init...</div>
+<div id="debug-console">V38 Booting...</div>
 
 <div class="app-container">
     <div class="sidebar">
-        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V37</div>
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V38</div>
         <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
 
         <div class="dash-grid">
@@ -171,4 +190,41 @@
                 </div>
             </div>
 
-            <div id="card_cooldown" class="phase-card
+            <div id="card_cooldown" class="phase-card">
+                <div class="phase-header"><span>COOL DOWN</span><span id="timer_cooldown">00:00</span></div>
+                <div class="controls-row">
+                    <div class="control-group">
+                        <button id="btn_cooldown_res_minus" class="ctrl-btn">-</button>
+                        <span id="val_res_cooldown" style="font-weight:bold;">--</span>
+                        <button id="btn_cooldown_res_plus" class="ctrl-btn">+</button>
+                    </div>
+                    <div class="control-group">
+                        <button id="btn_cooldown_time_minus" class="ctrl-btn">-</button>
+                        <span id="val_time_cooldown" style="font-weight:bold;">--</span>
+                        <button id="btn_cooldown_time_plus" class="ctrl-btn">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 1. CONFIG ---
+    const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
+    const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
+    const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
+
+    let controlChar = null;
+    let currentStatus = 'IDLE'; 
+    let currentPhase = null; 
+    const phaseOrder = ['warmup', 'workout1', 'workout2', 'cooldown'];
+    
+    // Traffic Control
+    let targetResistance = 1; 
+    let sentResistance = -99; 
+    let isWriting = false;    
+    let syncInterval = null;
+    let workoutInterval;
+
+    const defaultPhases = {
