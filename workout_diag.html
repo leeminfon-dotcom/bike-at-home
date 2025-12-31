@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V35.1 (Manual Bug Fix)</title>
+    <title>Horizon V35.2 (Manual Bug Fix)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -109,11 +109,11 @@
 </head>
 <body>
 
-<div id="debug-console">V35.1 Init...</div>
+<div id="debug-console">V35.2 Init...</div>
 
 <div class="app-container">
     <div class="sidebar">
-        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35</div>
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35.2</div>
         <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
 
         <div class="dash-grid">
@@ -330,15 +330,14 @@
     }
 
     // Traffic Control Loop (Fixed)
-    let lastWriteTime = 0;
+    let lastWriteTime = 0; // 新增變數
 
     async function bleSyncLoop() {
         if(!controlChar) return;
 
-        // Deadlock Breaker: If stuck writing for > 1s, force release
+        // 1. 防死鎖：如果卡住超過 1 秒，強制解鎖
         if(isWriting && (Date.now() - lastWriteTime > 1000)) {
             isWriting = false;
-            // rawLog("Auto-released lock", 'err');
         }
 
         if(isWriting) return;
@@ -348,7 +347,7 @@
             lastWriteTime = Date.now();
             
             try {
-                // FIX: Update UI immediately to match target
+                // 2. 介面同步：發送前先更新儀表板數字
                 if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
 
                 rawLog(`TX Level: ${targetResistance}`, 'tx');
@@ -455,11 +454,11 @@
         const c = document.getElementById(`card_${k}`);
         if(c) c.classList.add('active');
         
-        // Force loop to send
+        // 強制重送
         sentResistance = -99; 
         targetResistance = phases[k].res;
         
-        // Force UI update
+        // 強制更新儀表板
         if(ui.res) ui.res.innerText = targetResistance;
         
         rawLog(`Phase ${k}. Target: ${targetResistance}`);
@@ -525,16 +524,17 @@
             document.getElementById(`val_res_${k}`).innerText = phases[k].res;
             document.getElementById(`val_time_${k}`).innerText = phases[k].mins;
             document.getElementById(`timer_${k}`).innerText = fmt(phases[k].remainingSecs);
-            tm += phases[k].mins; tr += phases[k].remainingSecs;
+            tm += phases[k].mins; 
+            tr += phases[k].remainingSecs;
         }
         
-        // FIX: Global Timer is Countdown
+        // 大數字顯示倒數 (tr)
         if(ui.globalTimer) ui.globalTimer.innerText = fmt(tr);
         
-        // FIX: Label is Total Plan
+        // 小標籤顯示總計畫長度 (tm)
         if(ui.totalLabel) ui.totalLabel.innerText = "Plan: " + tm + " Mins";
 
-        // FIX: Sync Dashboard Level if Active
+        // 確保儀表板 Level 也是對的
         if(currentStatus !== 'IDLE' && ui.res) {
             ui.res.innerText = targetResistance;
         }
@@ -643,4 +643,5 @@
 </script>
 </body>
 </html>
+
 
