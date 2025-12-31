@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V28 (iPad Fix)</title>
+    <title>Horizon V29 (Stable Event Binding)</title>
     <style>
         :root {
             --bg: #0f172a; --sidebar: #1e293b; --surface: #334155;
@@ -16,7 +16,7 @@
             background: var(--bg); color: var(--text);
             margin: 0; padding: 0;
             height: 100vh; display: flex; overflow: hidden;
-            -webkit-font-smoothing: antialiased; /* Make fonts sharp on iPad */
+            -webkit-font-smoothing: antialiased;
         }
 
         /* --- Layout --- */
@@ -79,12 +79,11 @@
         /* --- Right Side --- */
         .chart-box {
             width: 100%; max-width: 700px; 
-            height: 220px; /* Explicit Height */
-            min-height: 200px; /* Safety min-height */
+            height: 220px; 
+            min-height: 200px;
             background: #1e293b; border-radius: 12px; border: 1px solid #475569;
             margin-bottom: 20px; position: relative; overflow: hidden;
         }
-        /* Canvas must fill container */
         canvas { width: 100%; height: 100%; display: block; }
 
         .global-timer {
@@ -147,7 +146,7 @@
     
     <div class="sidebar">
         <div>
-            <div class="brand">HORIZON V28</div>
+            <div class="brand">HORIZON V29</div>
             <div id="btStatus" class="bt-status">Disconnected</div>
         </div>
 
@@ -159,20 +158,20 @@
         </div>
 
         <div class="btn-group">
-            <button id="connectBtn" class="main-btn btn-connect" onclick="startScan()">1. Scan & Connect</button>
-            <button id="startBtn" class="main-btn btn-start" onclick="toggleWorkout()">START</button>
+            <button id="connectBtn" class="main-btn btn-connect">1. Scan & Connect</button>
+            <button id="startBtn" class="main-btn btn-start">START</button>
             
             <div class="jump-row">
-                <button class="btn-jump" onclick="jumpPhase('prev')">&lt;&lt; PREV</button>
-                <button class="btn-jump" onclick="jumpPhase('next')">NEXT &gt;&gt;</button>
+                <button id="prevBtn" class="btn-jump">&lt;&lt; PREV</button>
+                <button id="nextBtn" class="btn-jump">NEXT &gt;&gt;</button>
             </div>
 
-            <button id="stopBtn" class="main-btn btn-stop" onclick="stopWorkout()">STOP</button>
-            <button id="resetBtn" class="main-btn btn-reset" onclick="factoryReset()">Factory Reset Settings</button>
+            <button id="stopBtn" class="main-btn btn-stop">STOP</button>
+            <button id="resetBtn" class="main-btn btn-reset">Factory Reset Settings</button>
         </div>
         
         <div style="flex:1"></div> 
-        <div style="font-size:10px; color:#555; text-align:center; margin-top:20px;">V28: iPad Retina & BLE Fix</div>
+        <div style="font-size:10px; color:#555; text-align:center; margin-top:20px;">V29: Stable Event Binding</div>
     </div>
 
     <div class="content">
@@ -189,14 +188,14 @@
                 <div class="phase-header"><span class="phase-title">WARM UP</span><span id="timer_warmup" class="phase-timer">00:00</span></div>
                 <div class="controls-row">
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjRes('warmup', -1)">-</button>
+                        <button id="btn_warmup_res_minus" class="ctrl-btn">-</button>
                         <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_warmup" class="ctrl-val c-res">--</span></div>
-                        <button class="ctrl-btn" onclick="adjRes('warmup', 1)">+</button>
+                        <button id="btn_warmup_res_plus" class="ctrl-btn">+</button>
                     </div>
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjTime('warmup', -1)">-</button>
+                        <button id="btn_warmup_time_minus" class="ctrl-btn">-</button>
                         <div class="col-center"><span class="ctrl-lbl">MIN</span><span id="val_time_warmup" class="ctrl-val">--</span></div>
-                        <button class="ctrl-btn" onclick="adjTime('warmup', 1)">+</button>
+                        <button id="btn_warmup_time_plus" class="ctrl-btn">+</button>
                     </div>
                 </div>
             </div>
@@ -205,14 +204,14 @@
                 <div class="phase-header"><span class="phase-title">WORKOUT 1</span><span id="timer_workout1" class="phase-timer">00:00</span></div>
                 <div class="controls-row">
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjRes('workout1', -1)">-</button>
+                        <button id="btn_workout1_res_minus" class="ctrl-btn">-</button>
                         <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_workout1" class="ctrl-val c-res">--</span></div>
-                        <button class="ctrl-btn" onclick="adjRes('workout1', 1)">+</button>
+                        <button id="btn_workout1_res_plus" class="ctrl-btn">+</button>
                     </div>
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjTime('workout1', -1)">-</button>
+                        <button id="btn_workout1_time_minus" class="ctrl-btn">-</button>
                         <div class="col-center"><span class="ctrl-lbl">MIN</span><span id="val_time_workout1" class="ctrl-val">--</span></div>
-                        <button class="ctrl-btn" onclick="adjTime('workout1', 1)">+</button>
+                        <button id="btn_workout1_time_plus" class="ctrl-btn">+</button>
                     </div>
                 </div>
             </div>
@@ -221,421 +220,11 @@
                 <div class="phase-header"><span class="phase-title">WORKOUT 2</span><span id="timer_workout2" class="phase-timer">00:00</span></div>
                 <div class="controls-row">
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjRes('workout2', -1)">-</button>
+                        <button id="btn_workout2_res_minus" class="ctrl-btn">-</button>
                         <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_workout2" class="ctrl-val c-res">--</span></div>
-                        <button class="ctrl-btn" onclick="adjRes('workout2', 1)">+</button>
+                        <button id="btn_workout2_res_plus" class="ctrl-btn">+</button>
                     </div>
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjTime('workout2', -1)">-</button>
+                        <button id="btn_workout2_time_minus" class="ctrl-btn">-</button>
                         <div class="col-center"><span class="ctrl-lbl">MIN</span><span id="val_time_workout2" class="ctrl-val">--</span></div>
-                        <button class="ctrl-btn" onclick="adjTime('workout2', 1)">+</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="card_cooldown" class="phase-card">
-                <div class="phase-header"><span class="phase-title">COOL DOWN</span><span id="timer_cooldown" class="phase-timer">00:00</span></div>
-                <div class="controls-row">
-                    <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjRes('cooldown', -1)">-</button>
-                        <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_cooldown" class="ctrl-val c-res">--</span></div>
-                        <button class="ctrl-btn" onclick="adjRes('cooldown', 1)">+</button>
-                    </div>
-                    <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjTime('cooldown', -1)">-</button>
-                        <div class="col-center"><span class="ctrl-lbl">MIN</span><span id="val_time_cooldown" class="ctrl-val">--</span></div>
-                        <button class="ctrl-btn" onclick="adjTime('cooldown', 1)">+</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="console-log">V28 Loaded (iPad/BLE Fixed).</div>
-    </div>
-</div>
-
-<script>
-    // --- 0. Logging & Error ---
-    const logBox = document.getElementById('console-log');
-    function log(msg) {
-        const d = new Date();
-        const ts = `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
-        if(logBox) {
-            logBox.innerHTML += `<div><span style="color:#888">[${ts}]</span> ${msg}</div>`;
-            logBox.scrollTop = logBox.scrollHeight;
-        }
-        console.log(msg);
-    }
-    window.onerror = (msg, url, line) => {
-        const err = document.getElementById('sys-error');
-        err.style.display='block';
-        err.innerText = `ERROR: ${msg} (Line ${line})`;
-    };
-
-    // --- 1. Constants & State ---
-    const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
-    const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
-    const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
-
-    let controlChar = null;
-    let currentStatus = 'IDLE'; 
-    let currentPhase = null; 
-    const phaseOrder = ['warmup', 'workout1', 'workout2', 'cooldown'];
-    
-    let workoutInterval = null;
-    let keeperInterval = null;
-    let lastCmdTime = 0;
-
-    const defaultPhases = {
-        warmup:   { mins: 3,  res: 15 },
-        workout1: { mins: 7,  res: 22 },
-        workout2: { mins: 8,  res: 25 },
-        cooldown: { mins: 3,  res: 10 }
-    };
-    
-    let phases = JSON.parse(JSON.stringify(defaultPhases));
-
-    // UI Refs
-    const ui = {
-        rpm: document.getElementById('rpmVal'),
-        pwr: document.getElementById('pwrVal'),
-        spd: document.getElementById('spdVal'),
-        res: document.getElementById('resVal'),
-        btStatus: document.getElementById('btStatus'),
-        startBtn: document.getElementById('startBtn'),
-        connectBtn: document.getElementById('connectBtn'),
-        globalTimer: document.getElementById('globalTimer'),
-        totalLabel: document.getElementById('totalLabel'),
-        canvas: document.getElementById('workoutChart')
-    };
-
-    // --- 2. Init & Persistence ---
-    function init() {
-        loadSettings();
-        refreshUI();
-        // Delay canvas init slightly to ensure layout is done on Mobile
-        setTimeout(() => {
-            resizeCanvas();
-            drawChart();
-        }, 300);
-        window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
-    }
-
-    function loadSettings() {
-        const saved = localStorage.getItem('horizon_config_v26');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                for(let k in phases) {
-                    if(parsed[k]) {
-                        phases[k].mins = parsed[k].mins;
-                        phases[k].res = parsed[k].res;
-                    }
-                }
-                log("Settings loaded.");
-            } catch(e) { log("Load error, using defaults."); }
-        }
-        resetTimers();
-    }
-
-    function saveSettings() {
-        const toSave = {};
-        for(let k in phases) {
-            toSave[k] = { mins: phases[k].mins, res: phases[k].res };
-        }
-        localStorage.setItem('horizon_config_v26', JSON.stringify(toSave));
-    }
-
-    window.factoryReset = function() {
-        if(!confirm("Reset settings?")) return;
-        localStorage.removeItem('horizon_config_v26');
-        phases = JSON.parse(JSON.stringify(defaultPhases));
-        resetTimers();
-        refreshUI();
-        drawChart();
-        log("Settings Reset.");
-    };
-
-    function resetTimers() {
-        for(let k in phases) {
-            phases[k].remainingSecs = phases[k].mins * 60;
-        }
-        updateTotalLabel();
-    }
-
-    // --- 3. Bluetooth ---
-    window.startScan = async function() {
-        if (!navigator.bluetooth) return alert("Browser does not support Web Bluetooth.");
-        try {
-            ui.connectBtn.innerText = "Scanning...";
-            const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: [FTMS_UUID] 
-            });
-            device.addEventListener('gattserverdisconnected', onDisconnect);
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService(FTMS_UUID);
-            controlChar = await service.getCharacteristic(CTRL_UUID);
-            const dataChar = await service.getCharacteristic(DATA_UUID);
-            await dataChar.startNotifications();
-            dataChar.addEventListener('characteristicvaluechanged', parseData);
-            
-            // Wake up sequence
-            log("Sending Wake Up...");
-            await sendHex(0x00);
-            await sendHex(0x07);
-
-            ui.btStatus.innerText = "Connected";
-            ui.btStatus.classList.add('connected');
-            ui.connectBtn.style.display = 'none';
-            log("Bluetooth Connected!");
-        } catch(e) {
-            ui.connectBtn.innerText = "1. Scan & Connect";
-            log("Connection Failed: " + e);
-            alert("Connect Failed: " + e);
-        }
-    };
-
-    function onDisconnect() {
-        ui.btStatus.innerText = "Disconnected";
-        ui.btStatus.classList.remove('connected');
-        ui.connectBtn.style.display = 'block';
-        if(currentStatus !== 'IDLE') stopWorkout();
-        alert("Bike Disconnected!");
-    }
-
-    // --- 4. Workout Logic ---
-    window.toggleWorkout = function() {
-        if (currentStatus === 'IDLE') startWorkout();
-        else if (currentStatus === 'RUNNING') pauseWorkout();
-        else if (currentStatus === 'PAUSED') resumeWorkout();
-    };
-
-    function startWorkout() {
-        saveSettings();
-        if(!controlChar) log("⚠️ Warning: No Bike Connected");
-        
-        sendHex(0x07); // Ensure wake
-        
-        if(!currentPhase) currentPhase = 'warmup';
-        
-        currentStatus = 'RUNNING';
-        updateStartBtn();
-        
-        keeperInterval = setInterval(keeperLoop, 3000);
-        workoutInterval = setInterval(timerLoop, 1000);
-        
-        activatePhase(currentPhase);
-        log("Workout STARTED");
-    }
-
-    function pauseWorkout() {
-        currentStatus = 'PAUSED';
-        clearInterval(workoutInterval);
-        clearInterval(keeperInterval);
-        updateStartBtn();
-        log("Workout PAUSED");
-    }
-
-    function resumeWorkout() {
-        currentStatus = 'RUNNING';
-        updateStartBtn();
-        keeperInterval = setInterval(keeperLoop, 3000);
-        workoutInterval = setInterval(timerLoop, 1000);
-        setResistance(phases[currentPhase].res);
-        log("Workout RESUMED");
-    }
-
-    window.stopWorkout = function() {
-        currentStatus = 'IDLE';
-        currentPhase = null;
-        clearInterval(workoutInterval);
-        clearInterval(keeperInterval);
-        updateStartBtn();
-        document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
-        resetTimers();
-        refreshUI();
-        setResistance(1); // Reset bike to 1
-        saveSettings();
-        drawChart();
-        log("Workout STOPPED");
-    };
-
-    // --- Jump Logic ---
-    window.jumpPhase = function(direction) {
-        // Allow jumping even if IDLE to preview, but usually for running
-        let idx = phaseOrder.indexOf(currentPhase || 'warmup');
-        if(direction === 'next') idx++;
-        else idx--;
-
-        if(idx < 0 || idx >= phaseOrder.length) return log("No phase there.");
-
-        const newPhase = phaseOrder[idx];
-        log(`>>> Jumping to ${newPhase.toUpperCase()}`);
-        
-        // Reset timer
-        phases[newPhase].remainingSecs = phases[newPhase].mins * 60;
-        
-        activatePhase(newPhase);
-        refreshUI();
-        drawChart();
-    };
-
-    function activatePhase(pKey) {
-        currentPhase = pKey;
-        
-        // UI Highlight
-        document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
-        document.getElementById(`card_${pKey}`).classList.add('active');
-        
-        // ⚡ Force Resistance Update (Crucial Fix)
-        const targetRes = phases[pKey].res;
-        log(`Phase: ${pKey} -> SET LEVEL ${targetRes}`);
-        setResistance(targetRes);
-        
-        // Double tap for reliability
-        setTimeout(() => setResistance(targetRes), 500);
-    }
-
-    function nextPhase() {
-        let idx = phaseOrder.indexOf(currentPhase);
-        if(idx < phaseOrder.length - 1) {
-            activatePhase(phaseOrder[idx+1]);
-        } else {
-            stopWorkout();
-            alert("Workout Complete!");
-        }
-    }
-
-    function updateStartBtn() {
-        const btn = ui.startBtn;
-        if(currentStatus === 'IDLE') {
-            btn.innerText = "START"; btn.className = "main-btn btn-start";
-        } else if(currentStatus === 'RUNNING') {
-            btn.innerText = "PAUSE"; btn.className = "main-btn btn-pause";
-        } else if(currentStatus === 'PAUSED') {
-            btn.innerText = "RESUME"; btn.className = "main-btn btn-start";
-        }
-    }
-
-    function timerLoop() {
-        if(!currentPhase) return;
-        if (phases[currentPhase].remainingSecs > 0) {
-            phases[currentPhase].remainingSecs--;
-        }
-        if (phases[currentPhase].remainingSecs <= 0) {
-            nextPhase();
-        }
-        refreshUI();
-        drawChart();
-    }
-
-    function keeperLoop() {
-        // Periodically resend resistance to keep bike awake and correct
-        if(currentStatus === 'RUNNING' && currentPhase) {
-            setResistanceInternal(phases[currentPhase].res);
-        }
-    }
-
-    // --- 5. Data & Controls ---
-    
-    window.adjTime = function(p, delta) {
-        if (phases[p].mins + delta < 1) return;
-        phases[p].mins += delta;
-        
-        // Real-time update logic
-        if (currentStatus === 'IDLE') {
-            phases[p].remainingSecs = phases[p].mins * 60;
-        } else {
-            if (currentPhase === p) {
-                phases[p].remainingSecs += (delta * 60);
-                if (phases[p].remainingSecs < 0) phases[p].remainingSecs = 0;
-            } else {
-                phases[p].remainingSecs = phases[p].mins * 60;
-            }
-        }
-        refreshUI();
-        drawChart();
-    };
-
-    window.adjRes = function(p, delta) {
-        phases[p].res += delta;
-        if(phases[p].res < 1) phases[p].res = 1;
-        if(phases[p].res > 32) phases[p].res = 32;
-        
-        // ⚡ Immediate Update Fix
-        // If we adjust the active phase, send command immediately regardless of PAUSE/RUN
-        if(currentPhase === p) {
-            log(`Adj ${p} -> Level ${phases[p].res}`);
-            setResistance(phases[p].res);
-        }
-        
-        refreshUI();
-        drawChart();
-    };
-
-    // --- Reliable Bluetooth Sending ---
-    async function setResistance(val) {
-        val = parseInt(val);
-        // Force UI update immediately for responsiveness
-        if(ui.res) ui.res.innerText = val;
-        
-        lastCmdTime = Date.now();
-        await setResistanceInternal(val);
-    }
-
-    async function setResistanceInternal(val) {
-        if(!controlChar) return;
-        const buffer = new ArrayBuffer(3);
-        const view = new DataView(buffer);
-        view.setUint8(0, 0x04);
-        view.setUint16(1, val * 10, true); // 0.1 unit
-        try { 
-            await controlChar.writeValue(buffer); 
-        } catch(e) {
-            console.log("Write Fail: " + e);
-        }
-    }
-
-    async function sendHex(b) {
-        if(controlChar) await controlChar.writeValue(new Uint8Array([b])).catch(()=>{});
-    }
-
-    function parseData(e) {
-        const val = e.target.value;
-        const flags = val.getUint16(0, true);
-        let offset = 2;
-        
-        if((flags & 0x01) === 0) {
-            ui.spd.innerText = (val.getUint16(offset, true)*0.01).toFixed(1);
-            offset+=2;
-        }
-        if(flags & 0x02) offset+=2;
-        if(flags & 0x04) {
-            ui.rpm.innerText = Math.floor(val.getUint16(offset, true)*0.5);
-            offset+=2;
-        }
-        if(flags & 0x08) offset+=2;
-        if(flags & 0x10) offset+=3;
-        if(flags & 0x20) {
-            const r = val.getInt16(offset, true);
-            // Only update UI from Bike Data if we haven't sent a command recently
-            // This prevents "flickering" when adjusting
-            if(r > 0 && (Date.now() - lastCmdTime > 3000)) {
-                ui.res.innerText = r;
-            }
-            offset+=2;
-        }
-        if(flags & 0x40) {
-            ui.pwr.innerText = val.getInt16(offset, true);
-            offset+=2;
-        }
-    }
-
-    function refreshUI() {
-        for(let k in phases) {
-            document.getElementById(`val_res_${k}`).innerText = phases[k].res;
-            document.getElementById(`val_time_${k}`).innerText = phases[k].mins;
-            document.getElementById(`timer_${k}`).innerText = fmtTime(phases[k].remainingSecs);
-        }
-        updateTotalLabel();
+                        <button id="btn_workout2_time_plus
