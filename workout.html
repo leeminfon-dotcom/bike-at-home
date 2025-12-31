@@ -1,160 +1,120 @@
+
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V26 (Dashboard & Chart)</title>
+    <title>Horizon V1.0</title>
+    
+    <script>
+        function rawLog(msg, type='info') {
+            const el = document.getElementById('debug-console');
+            if(el) {
+                const ln = document.createElement('div');
+                const ts = new Date().toLocaleTimeString().split(' ')[0];
+                ln.textContent = `[${ts}] ${msg}`;
+                if(type==='err') ln.className = 'log-err';
+                if(type==='tx') ln.className = 'log-tx';
+                if(type==='succ') ln.className = 'log-succ';
+                el.appendChild(ln);
+                el.scrollTop = el.scrollHeight;
+            }
+        }
+        window.onerror = function(msg, url, line) {
+            rawLog(`CRASH: ${msg} (L${line})`, 'err');
+        };
+    </script>
+
     <style>
         :root {
             --bg: #0f172a; --sidebar: #1e293b; --surface: #334155;
-            --primary: #3b82f6; --accent: #f59e0b; --danger: #ef4444;
-            --text: #f8fafc; --text-muted: #94a3b8;
+            --primary: #3b82f6; --text: #f8fafc; --text-muted: #94a3b8;
             --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: var(--bg); color: var(--text);
-            margin: 0; padding: 0;
-            height: 100vh; display: flex; overflow: hidden;
+            margin: 0; padding: 0; height: 100vh; display: flex; overflow: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* --- Layout --- */
-        .app-container {
-            display: flex; width: 100%; height: 100%;
+        /* Console */
+        #debug-console {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 160px;
+            background: rgba(0,0,0,0.95); color: #ccc; border-top: 2px solid #555;
+            font-size: 11px; padding: 10px; overflow-y: scroll; font-family: monospace;
+            z-index: 99999; box-sizing: border-box; white-space: pre-wrap;
         }
+        .log-err { color: #ff5555; font-weight: bold; }
+        .log-tx { color: #ffff55; } /* Yellow for sending */
+        .log-succ { color: #55ff55; } /* Green for success */
+
+        /* Layout */
+        /* FIX: Increased padding to 250px to show Cool Down */
+        .app-container { display: flex; width: 100%; height: 100%; }
         
-        /* Left Sidebar */
         .sidebar {
-            width: 300px; background: var(--sidebar);
-            padding: 20px; display: flex; flex-direction: column;
-            border-right: 1px solid #475569;
-            flex-shrink: 0; overflow-y: auto; z-index: 10;
+            width: 320px; background: var(--sidebar); padding: 20px; 
+            display: flex; flex-direction: column; border-right: 1px solid #475569;
+            flex-shrink: 0; overflow-y: auto;
+            padding-bottom: 250px; /* Fix: Space for console */
         }
-
-        /* Right Content */
         .content {
-            flex: 1; padding: 20px; overflow-y: auto;
+            flex: 1; padding: 20px; overflow-y: auto; position: relative;
             display: flex; flex-direction: column; align-items: center;
-            position: relative;
+            padding-bottom: 250px; /* Fix: Space for console */
         }
 
-        /* Mobile Layout */
-        @media (max-width: 800px) {
-            .app-container { flex-direction: column; overflow-y: auto; }
-            body { overflow: auto; height: auto; }
-            .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid #475569; box-sizing: border-box; }
-            .content { width: 100%; padding: 15px; box-sizing: border-box; }
-            /* Hide console on mobile unless needed */
-            #console-log { height: 80px; }
+        @media (max-width: 820px) {
+            .app-container { flex-direction: column; }
+            .sidebar { width: 100%; border-right: none; }
         }
 
-        /* --- Components --- */
-        .brand { font-size: 20px; font-weight: 800; color: white; margin-bottom: 5px; letter-spacing: 1px; }
-        .bt-status { font-size: 12px; color: #64748b; font-weight: bold; margin-bottom: 20px; }
-        .bt-status.connected { color: var(--primary); }
+        /* UI */
+        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .mini-card { background: var(--surface); padding: 10px; border-radius: 12px; text-align: center; }
+        .mini-val { font-size: 24px; font-weight: 800; }
+        .mini-lbl { font-size: 10px; color: var(--text-muted); }
+        .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } 
+        .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
 
-        /* Dashboard Grid (Left Side) */
-        .dash-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-            margin-bottom: 25px;
-        }
-        .mini-card { background: var(--surface); padding: 12px 5px; border-radius: 12px; text-align: center; }
-        .mini-val { font-size: 22px; font-weight: 800; line-height: 1; }
-        .mini-lbl { font-size: 9px; color: var(--text-muted); margin-top: 4px; }
-        .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
-
-        /* Buttons */
-        .btn-group { display: flex; flex-direction: column; gap: 10px; width: 100%; }
         .main-btn {
-            padding: 16px; border-radius: 10px; border: none; 
+            width: 100%; padding: 15px; margin-bottom: 10px; border-radius: 10px; border: none; 
             font-weight: bold; font-size: 16px; color: white; cursor: pointer;
-            text-transform: uppercase; transition: 0.2s;
         }
         .btn-connect { background: var(--primary); }
         .btn-start { background: #10b981; }
-        .btn-pause { background: #f59e0b; } /* Yellow for Pause */
         .btn-stop { background: #ef4444; }
-        .btn-reset { background: transparent; border: 1px solid #475569; color: #94a3b8; font-size: 12px; padding: 10px; margin-top: 10px;}
-        .btn-reset:hover { border-color: #ef4444; color: #ef4444; }
-
-        /* --- Right Side Content --- */
         
-        /* Chart Area */
+        .jump-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .btn-jump { flex: 1; background: #475569; color: white; border: none; padding: 12px; border-radius: 8px; }
+
         .chart-box {
-            width: 100%; max-width: 600px; height: 160px;
-            background: #1e293b; border-radius: 12px; border: 1px solid #475569;
-            margin-bottom: 20px; position: relative; overflow: hidden;
+            width: 100%; max-width: 600px; height: 200px; 
+            background: #1e293b; border-radius: 12px; margin-bottom: 20px;
         }
         canvas { width: 100%; height: 100%; display: block; }
 
-        /* Global Timer */
-        .global-timer {
-            font-size: 48px; font-weight: bold; font-family: monospace; 
-            margin-bottom: 5px; text-shadow: 0 2px 10px rgba(0,0,0,0.5);
-        }
-        .global-sub { color: #64748b; font-size: 14px; margin-bottom: 20px; }
-
-        /* Phase Cards */
-        .phase-list { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px; padding-bottom: 100px;}
-        .phase-card {
-            background: #1e293b; border: 1px solid #334155;
-            border-radius: 12px; padding: 12px 15px; transition: 0.3s;
-            position: relative; overflow: hidden;
-        }
-        .phase-card.active { 
-            border-color: var(--primary); background: #1e293b; 
-            box-shadow: 0 0 0 2px rgba(59,130,246,0.3) inset;
-        }
-        /* Active indicator bar */
-        .phase-card.active::before {
-            content:''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--primary);
-        }
-
-        .phase-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .phase-title { font-weight: bold; font-size: 14px; color: var(--text-muted); }
-        .phase-card.active .phase-title { color: var(--primary); }
-        .phase-timer { font-family: monospace; font-size: 16px; color: white; }
-
-        /* Controls inside cards */
-        .controls-row { display: flex; justify-content: space-between; gap: 10px; }
-        .control-group { 
-            background: rgba(0,0,0,0.2); padding: 5px 8px; border-radius: 8px; flex: 1; 
-            display: flex; justify-content: space-between; align-items: center; 
-        }
-        .ctrl-btn {
-            width: 28px; height: 28px; border-radius: 50%; border: none;
-            background: #475569; color: white; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-        }
-        .ctrl-btn:hover { background: #64748b; }
-        .ctrl-val { font-size: 18px; font-weight: 800; min-width: 30px; text-align: center; }
-        .ctrl-lbl { font-size: 9px; color: #aaa; text-align:center; display: block;}
-        .col-center { display:flex; flex-direction:column; align-items:center; }
-
-        /* Console */
-        #console-log {
-            width: 100%; background: rgba(0,0,0,0.5); color: #0f0; 
-            font-size: 10px; padding: 10px; font-family: monospace; 
-            border-top: 1px solid #333; height: 100px; overflow-y: scroll;
-            margin-top: auto; /* Push to bottom of content if needed */
-        }
+        .global-timer { font-size: 48px; font-weight: bold; margin-bottom: 5px; }
         
-        #sys-error {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 999;
-            background: #ef4444; color: white; padding: 10px; text-align: center; display: none;
-        }
+        .phase-list { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px; }
+        .phase-card { background: #1e293b; padding: 15px; border-radius: 12px; border: 1px solid #334155; }
+        .phase-card.active { border-color: var(--primary); background: #17253d; }
+        .phase-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; }
+        
+        .controls-row { display: flex; gap: 10px; }
+        .control-group { background: rgba(0,0,0,0.2); padding: 5px; border-radius: 8px; flex: 1; display: flex; justify-content: space-between; align-items: center; }
+        .ctrl-btn { width: 30px; height: 30px; border-radius: 50%; border: none; background: #475569; color: white; }
     </style>
 </head>
 <body>
 
-<div id="sys-error"></div>
+<div id="debug-console">V1.0 Init...</div>
 
 <div class="app-container">
-    
     <div class="sidebar">
-        <div>
-            <div class="brand">HORIZON V26</div>
-            <div id="btStatus" class="bt-status">Disconnected</div>
-        </div>
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V1.0</div>
+        <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
 
         <div class="dash-grid">
             <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
@@ -163,617 +123,567 @@
             <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LEVEL</div></div>
         </div>
 
-        <div class="btn-group">
-            <button id="connectBtn" class="main-btn btn-connect" onclick="startScan()">Scan & Connect</button>
-            <button id="startBtn" class="main-btn btn-start" onclick="toggleWorkout()">START</button>
-            <button id="stopBtn" class="main-btn btn-stop" onclick="stopWorkout()">STOP</button>
-            <button id="resetBtn" class="main-btn btn-reset" onclick="factoryReset()">Factory Reset Settings</button>
+        <button id="connectBtn" class="main-btn btn-connect">1. Connect</button>
+        <button id="startBtn" class="main-btn btn-start">START</button>
+        <div class="jump-row">
+            <button id="prevBtn" class="btn-jump">&lt; PREV</button>
+            <button id="nextBtn" class="btn-jump">NEXT &gt;</button>
         </div>
-        
-        <div style="flex:1"></div> <div style="font-size:10px; color:#555; text-align:center; margin-top:20px;">Memory & Chart Enabled</div>
+        <button id="stopBtn" class="main-btn btn-stop">STOP</button>
+        <button id="resetBtn" style="background:none; border:1px solid #555; color:#888; padding:8px; width:100%;">Reset Settings</button>
     </div>
 
     <div class="content">
-        
-        <div class="chart-box">
-            <canvas id="workoutChart"></canvas>
-        </div>
-
+        <div class="chart-box"><canvas id="workoutChart"></canvas></div>
         <div id="globalTimer" class="global-timer">00:00</div>
-        <div id="totalLabel" class="global-sub">Total Time</div>
+        <div id="totalLabel" style="color:#666; margin-bottom:20px;">Total Time</div>
 
         <div class="phase-list">
             <div id="card_warmup" class="phase-card">
-                <div class="phase-header"><span class="phase-title">WARM UP</span><span id="timer_warmup" class="phase-timer">00:00</span></div>
+                <div class="phase-header"><span>WARM UP</span><span id="timer_warmup">00:00</span></div>
                 <div class="controls-row">
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjRes('warmup', -1)">-</button>
-                        <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_warmup" class="ctrl-val c-res">--</span></div>
-                        <button class="ctrl-btn" onclick="adjRes('warmup', 1)">+</button>
+                        <button id="btn_warmup_res_minus" class="ctrl-btn">-</button>
+                        <span id="val_res_warmup" style="font-weight:bold;">--</span>
+                        <button id="btn_warmup_res_plus" class="ctrl-btn">+</button>
                     </div>
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjTime('warmup', -1)">-</button>
-                        <div class="col-center"><span class="ctrl-lbl">MIN</span><span id="val_time_warmup" class="ctrl-val">--</span></div>
-                        <button class="ctrl-btn" onclick="adjTime('warmup', 1)">+</button>
+                        <button id="btn_warmup_time_minus" class="ctrl-btn">-</button>
+                        <span id="val_time_warmup" style="font-weight:bold;">--</span>
+                        <button id="btn_warmup_time_plus" class="ctrl-btn">+</button>
                     </div>
                 </div>
             </div>
             
             <div id="card_workout1" class="phase-card">
-                <div class="phase-header"><span class="phase-title">WORKOUT 1</span><span id="timer_workout1" class="phase-timer">00:00</span></div>
+                <div class="phase-header"><span>WORKOUT 1</span><span id="timer_workout1">00:00</span></div>
                 <div class="controls-row">
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjRes('workout1', -1)">-</button>
-                        <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_workout1" class="ctrl-val c-res">--</span></div>
-                        <button class="ctrl-btn" onclick="adjRes('workout1', 1)">+</button>
+                        <button id="btn_workout1_res_minus" class="ctrl-btn">-</button>
+                        <span id="val_res_workout1" style="font-weight:bold;">--</span>
+                        <button id="btn_workout1_res_plus" class="ctrl-btn">+</button>
                     </div>
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjTime('workout1', -1)">-</button>
-                        <div class="col-center"><span class="ctrl-lbl">MIN</span><span id="val_time_workout1" class="ctrl-val">--</span></div>
-                        <button class="ctrl-btn" onclick="adjTime('workout1', 1)">+</button>
+                        <button id="btn_workout1_time_minus" class="ctrl-btn">-</button>
+                        <span id="val_time_workout1" style="font-weight:bold;">--</span>
+                        <button id="btn_workout1_time_plus" class="ctrl-btn">+</button>
                     </div>
                 </div>
             </div>
 
             <div id="card_workout2" class="phase-card">
-                <div class="phase-header"><span class="phase-title">WORKOUT 2</span><span id="timer_workout2" class="phase-timer">00:00</span></div>
+                <div class="phase-header"><span>WORKOUT 2</span><span id="timer_workout2">00:00</span></div>
                 <div class="controls-row">
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjRes('workout2', -1)">-</button>
-                        <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_workout2" class="ctrl-val c-res">--</span></div>
-                        <button class="ctrl-btn" onclick="adjRes('workout2', 1)">+</button>
+                        <button id="btn_workout2_res_minus" class="ctrl-btn">-</button>
+                        <span id="val_res_workout2" style="font-weight:bold;">--</span>
+                        <button id="btn_workout2_res_plus" class="ctrl-btn">+</button>
                     </div>
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjTime('workout2', -1)">-</button>
-                        <div class="col-center"><span class="ctrl-lbl">MIN</span><span id="val_time_workout2" class="ctrl-val">--</span></div>
-                        <button class="ctrl-btn" onclick="adjTime('workout2', 1)">+</button>
+                        <button id="btn_workout2_time_minus" class="ctrl-btn">-</button>
+                        <span id="val_time_workout2" style="font-weight:bold;">--</span>
+                        <button id="btn_workout2_time_plus" class="ctrl-btn">+</button>
                     </div>
                 </div>
             </div>
 
             <div id="card_cooldown" class="phase-card">
-                <div class="phase-header"><span class="phase-title">COOL DOWN</span><span id="timer_cooldown" class="phase-timer">00:00</span></div>
+                <div class="phase-header"><span>COOL DOWN</span><span id="timer_cooldown">00:00</span></div>
                 <div class="controls-row">
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjRes('cooldown', -1)">-</button>
-                        <div class="col-center"><span class="ctrl-lbl">LEVEL</span><span id="val_res_cooldown" class="ctrl-val c-res">--</span></div>
-                        <button class="ctrl-btn" onclick="adjRes('cooldown', 1)">+</button>
+                        <button id="btn_cooldown_res_minus" class="ctrl-btn">-</button>
+                        <span id="val_res_cooldown" style="font-weight:bold;">--</span>
+                        <button id="btn_cooldown_res_plus" class="ctrl-btn">+</button>
                     </div>
                     <div class="control-group">
-                        <button class="ctrl-btn" onclick="adjTime('cooldown', -1)">-</button>
-                        <div class="col-center"><span class="ctrl-lbl">MIN</span><span id="val_time_cooldown" class="ctrl-val">--</span></div>
-                        <button class="ctrl-btn" onclick="adjTime('cooldown', 1)">+</button>
+                        <button id="btn_cooldown_time_minus" class="ctrl-btn">-</button>
+                        <span id="val_time_cooldown" style="font-weight:bold;">--</span>
+                        <button id="btn_cooldown_time_plus" class="ctrl-btn">+</button>
                     </div>
                 </div>
             </div>
         </div>
-
-        <div id="console-log">V26 Ready (Charts+Pause+Reset).</div>
     </div>
 </div>
 
 <script>
-    // --- 0. Logging & Error ---
-    const logBox = document.getElementById('console-log');
-    function log(msg) {
-        const ts = new Date().toLocaleTimeString().split(' ')[0];
-        if(logBox) {
-            logBox.innerHTML += `<div><span style="color:#666">[${ts}]</span> ${msg}</div>`;
-            logBox.scrollTop = logBox.scrollHeight;
-        }
-        console.log(msg);
-    }
-    window.onerror = (msg, url, line) => {
-        document.getElementById('sys-error').style.display='block';
-        document.getElementById('sys-error').innerText = `CRASH: ${msg} (L${line})`;
-    };
-
-    // --- 1. State & Constants ---
+    // --- 1. CONFIG & STATE ---
     const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
     const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
     const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
 
     let controlChar = null;
-    let currentStatus = 'IDLE'; // IDLE, RUNNING, PAUSED
-    let currentPhase = null;    // 'warmup', 'workout1'...
-    let workoutInterval = null;
-    let keeperInterval = null;
-    let lastCmdTime = 0;
-    let globalElapsedTime = 0; // Tracks total seconds played
+    let currentStatus = 'IDLE'; 
+    let currentPhase = null; 
+    const phaseOrder = ['warmup', 'workout1', 'workout2', 'cooldown'];
+    
+    // Traffic Control
+    let targetResistance = 1; 
+    let sentResistance = -99; 
+    let isWriting = false;    
+    let lastCmdTime = 0; // [新增] 記錄最後一次發送指令的時間
+    let syncInterval = null;
+    let workoutInterval;
 
-    // NEW DEFAULT VALUES (V26)
     const defaultPhases = {
         warmup:   { mins: 3,  res: 15 },
         workout1: { mins: 7,  res: 22 },
         workout2: { mins: 8,  res: 25 },
         cooldown: { mins: 3,  res: 10 }
     };
-    
-    // Active Settings (Loaded from Memory or Defaults)
     let phases = JSON.parse(JSON.stringify(defaultPhases));
+    let ui = {};
 
-    // UI Refs
-    const ui = {
-        rpm: document.getElementById('rpmVal'),
-        pwr: document.getElementById('pwrVal'),
-        spd: document.getElementById('spdVal'),
-        res: document.getElementById('resVal'),
-        btStatus: document.getElementById('btStatus'),
-        startBtn: document.getElementById('startBtn'),
-        connectBtn: document.getElementById('connectBtn'),
-        globalTimer: document.getElementById('globalTimer'),
-        totalLabel: document.getElementById('totalLabel'),
-        canvas: document.getElementById('workoutChart')
+    // --- 2. STARTUP ---
+    window.onload = function() {
+        try { initApp(); } 
+        catch(e) { rawLog(`INIT ERROR: ${e.message}`, 'err'); }
     };
 
-    // --- 2. Initialization & Persistence ---
+    function initApp() {
+        ui = {
+            btStatus: document.getElementById('btStatus'),
+            connectBtn: document.getElementById('connectBtn'),
+            startBtn: document.getElementById('startBtn'),
+            canvas: document.getElementById('workoutChart'),
+            globalTimer: document.getElementById('globalTimer'),
+            totalLabel: document.getElementById('totalLabel'), // Fixed mapping
+            res: document.getElementById('resVal')
+        };
 
-    function init() {
+        if(!ui.connectBtn) throw new Error("UI Load Fail");
+
+        // Event Binding
+        safeBind('connectBtn', startScan);
+        safeBind('startBtn', toggleWorkout);
+        safeBind('stopBtn', stopWorkout);
+        safeBind('resetBtn', factoryReset);
+        safeBind('prevBtn', () => jumpPhase('prev'));
+        safeBind('nextBtn', () => jumpPhase('next'));
+
+        ['warmup', 'workout1', 'workout2', 'cooldown'].forEach(key => {
+            safeBind(`btn_${key}_res_minus`, () => adjRes(key, -1));
+            safeBind(`btn_${key}_res_plus`, () => adjRes(key, 1));
+            safeBind(`btn_${key}_time_minus`, () => adjTime(key, -1));
+            safeBind(`btn_${key}_time_plus`, () => adjTime(key, 1));
+        });
+
         loadSettings();
         refreshUI();
-        resizeCanvas();
-        drawChart();
+        
+        // Start Sync Loop (Always running to catch manual changes)
+        if(syncInterval) clearInterval(syncInterval);
+        syncInterval = setInterval(bleSyncLoop, 250);
+
+        setTimeout(() => { resizeCanvas(); drawChart(); }, 300);
         window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
+        
+        rawLog("System Ready.");
     }
 
-    function loadSettings() {
-        const saved = localStorage.getItem('horizon_config_v26');
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                for(let k in phases) {
-                    if(parsed[k]) {
-                        phases[k].mins = parsed[k].mins;
-                        phases[k].res = parsed[k].res;
-                    }
-                }
-                log("Settings loaded from Memory.");
-            } catch(e) { log("Load error, using defaults."); }
-        }
-        // Initialize remainingSecs
-        resetTimers();
+    function safeBind(id, fn) {
+        const el = document.getElementById(id);
+        if(el) el.addEventListener('click', fn);
     }
 
-    function saveSettings() {
-        // Only save mins and res
-        const toSave = {};
-        for(let k in phases) {
-            toSave[k] = { mins: phases[k].mins, res: phases[k].res };
-        }
-        localStorage.setItem('horizon_config_v26', JSON.stringify(toSave));
-    }
-
-    window.factoryReset = function() {
-        if(!confirm("Reset all settings to default?")) return;
-        localStorage.removeItem('horizon_config_v26');
-        phases = JSON.parse(JSON.stringify(defaultPhases));
-        resetTimers();
-        refreshUI();
-        drawChart();
-        log("Factory Reset Complete.");
-    };
-
-    function resetTimers() {
-        for(let k in phases) {
-            phases[k].remainingSecs = phases[k].mins * 60;
-        }
-        globalElapsedTime = 0;
-        updateTotalLabel();
-    }
-
-    // --- 3. Bluetooth Logic ---
-
-    window.startScan = async function() {
-        if (!navigator.bluetooth) return alert("Web Bluetooth not supported.");
+    // --- 3. BLUETOOTH CORE ---
+    async function startScan() {
+        if(!navigator.bluetooth) return alert("Browser not supported");
         try {
             ui.connectBtn.innerText = "Scanning...";
-            const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: [FTMS_UUID] 
+            const dev = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true, 
+                optionalServices: [FTMS_UUID]
             });
-            device.addEventListener('gattserverdisconnected', onDisconnect);
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService(FTMS_UUID);
-            controlChar = await service.getCharacteristic(CTRL_UUID);
-            const dataChar = await service.getCharacteristic(DATA_UUID);
+            
+            rawLog(`Device: ${dev.name} (${dev.id})`);
+            
+            // Store Connection Info
+            localStorage.setItem('last_device_name', dev.name);
+            localStorage.setItem('last_device_id', dev.id);
+
+            dev.addEventListener('gattserverdisconnected', onDisconnect);
+            const server = await dev.gatt.connect();
+            const svc = await server.getPrimaryService(FTMS_UUID);
+            controlChar = await svc.getCharacteristic(CTRL_UUID);
+            const dataChar = await svc.getCharacteristic(DATA_UUID);
+            
             await dataChar.startNotifications();
             dataChar.addEventListener('characteristicvaluechanged', parseData);
+
+            // Handshake Sequence (Slower for reliability)
+            rawLog("Handshake: Request Control...", 'tx');
+            await sendHexDirect(0x00); 
+            await sleep(200); 
             
-            // Wake up
-            await sendHex(0x00);
-            await sendHex(0x07);
+            rawLog("Handshake: Start/Resume...", 'tx');
+            await sendHexDirect(0x07);
+            await sleep(200);
 
-            ui.btStatus.innerText = "Connected";
-            ui.btStatus.classList.add('connected');
+            ui.btStatus.innerText = "Connected: " + dev.name;
+            ui.btStatus.style.color = "#3b82f6";
             ui.connectBtn.style.display = 'none';
-            log("Bluetooth Connected.");
+            rawLog("Connected!", 'succ');
+            
         } catch(e) {
-            log("Scan/Connect Fail: " + e);
-            ui.connectBtn.innerText = "Scan & Connect";
-            alert("Connect Failed: " + e);
+            ui.connectBtn.innerText = "Connect";
+            rawLog(`Connect Fail: ${e.message}`, 'err');
         }
-    };
-
-    function onDisconnect() {
-        ui.btStatus.innerText = "Disconnected";
-        ui.btStatus.classList.remove('connected');
-        ui.connectBtn.style.display = 'block';
-        if(currentStatus !== 'IDLE') stopWorkout();
-        alert("Bike Disconnected!");
     }
 
-    // --- 4. Workout Logic (Start/Pause/Stop) ---
+    // Traffic Control Loop (Fixed: Re-assert Control)
+    let lastWriteTime = 0;
 
-    window.toggleWorkout = function() {
-        if (currentStatus === 'IDLE') {
-            startWorkout();
-        } else if (currentStatus === 'RUNNING') {
-            pauseWorkout();
-        } else if (currentStatus === 'PAUSED') {
-            resumeWorkout();
+    async function bleSyncLoop() {
+        if(!controlChar) return;
+
+        // 1. Watchdog
+        if(isWriting && (Date.now() - lastWriteTime > 1000)) {
+            rawLog("Watchdog: Resetting isWriting lock", 'err');
+            isWriting = false;
         }
-    };
+
+        if(isWriting) return;
+        
+        if(targetResistance !== sentResistance) {
+            
+            isWriting = true;
+            lastWriteTime = Date.now();
+            
+            try {
+                if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
+
+                // [修正點] 發送阻力前，先送一次 0x07 (Start/Resume) 喚醒設備
+                rawLog(`[TX] Waking (0x07) & Setting Res to ${targetResistance}...`, 'tx');
+                
+                // 1. Send Start/Resume
+                await controlChar.writeValue(new Uint8Array([0x07]));
+                
+                // 給一點點緩衝讓它處理 0x07
+                await sleep(50); 
+
+                // 2. Send Resistance (0x04)
+                const buf = new ArrayBuffer(3);
+                const v = new DataView(buf);
+                v.setUint8(0, 0x04); // OpCode
+                v.setUint16(1, targetResistance * 10, true); // Value
+                
+                await controlChar.writeValue(buf);
+                
+                rawLog(`[TX] 0x04 Written (Res: ${targetResistance})`, 'succ');
+                sentResistance = targetResistance;
+                lastCmdTime = Date.now();
+                
+            } catch(e) {
+                sentResistance = -99; 
+                rawLog(`TX ERROR: ${e.message}`, 'err');
+            } finally {
+                isWriting = false;
+            }
+        }
+    }
+    
+    async function sendHexDirect(b) {
+        if(controlChar) await controlChar.writeValue(new Uint8Array([b])).catch(e=>rawLog("HexErr:"+e));
+    }
+    
+    function onDisconnect() {
+        ui.btStatus.innerText = "Disconnected";
+        ui.btStatus.style.color = "#666";
+        ui.connectBtn.style.display = 'block';
+        if(currentStatus!=='IDLE') stopWorkout();
+        rawLog("Device Disconnected", 'err');
+    }
+
+    // --- 4. WORKOUT LOGIC ---
+    function toggleWorkout() {
+        if(currentStatus==='IDLE') startWorkout();
+        else if(currentStatus==='RUNNING') pauseWorkout();
+        else resumeWorkout();
+    }
 
     function startWorkout() {
-        log(">>> Starting Workout");
-        saveSettings(); // Save before start
-        sendHex(0x07);  // Wake up
+        saveSettings();
+        if(!controlChar) rawLog("Demo Mode (No Device)", 'err');
         
-        // Find which phase to start (usually warmup unless partially done logic added later)
-        // For simplicity, V26 always starts from beginning or currently active phase logic
+        sendHexDirect(0x07); // Ensure Wake
         
         if(!currentPhase) currentPhase = 'warmup';
-        
         currentStatus = 'RUNNING';
-        updateStartBtn();
+        updateBtns();
         
-        // Start Loops
-        keeperInterval = setInterval(keeperLoop, 3000);
+        if(workoutInterval) clearInterval(workoutInterval);
         workoutInterval = setInterval(timerLoop, 1000);
         
-        // Set initial resistance
         activatePhase(currentPhase);
+        rawLog("Workout Started.");
     }
 
     function pauseWorkout() {
-        log(">>> Paused");
         currentStatus = 'PAUSED';
         clearInterval(workoutInterval);
-        clearInterval(keeperInterval);
-        updateStartBtn();
+        updateBtns();
+        rawLog("Paused.");
     }
 
     function resumeWorkout() {
-        log(">>> Resumed");
         currentStatus = 'RUNNING';
-        updateStartBtn();
-        keeperInterval = setInterval(keeperLoop, 3000);
+        updateBtns();
         workoutInterval = setInterval(timerLoop, 1000);
-        // Resend resistance just in case
-        setResistance(phases[currentPhase].res);
+        sentResistance = -99; // Force resend on resume
+        rawLog("Resumed.");
     }
 
-    window.stopWorkout = function() {
-        log(">>> Stopped");
+    function stopWorkout() {
         currentStatus = 'IDLE';
         currentPhase = null;
         clearInterval(workoutInterval);
-        clearInterval(keeperInterval);
+        updateBtns();
+        document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
+        resetTimers(); refreshUI();
         
-        updateStartBtn();
-        document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
+        // Reset Bike
+        targetResistance = 1; 
         
-        resetTimers(); // Reset times back to full
-        refreshUI();
-        setResistance(1); // Safety reset
-        saveSettings();
-        drawChart(); // Reset chart
-    };
-
-    function updateStartBtn() {
-        const btn = ui.startBtn;
-        if(currentStatus === 'IDLE') {
-            btn.innerText = "START";
-            btn.className = "main-btn btn-start";
-        } else if(currentStatus === 'RUNNING') {
-            btn.innerText = "PAUSE";
-            btn.className = "main-btn btn-pause";
-        } else if(currentStatus === 'PAUSED') {
-            btn.innerText = "RESUME";
-            btn.className = "main-btn btn-start";
-        }
+        saveSettings(); drawChart();
+        rawLog("Stopped.");
     }
 
-    function activatePhase(phaseKey) {
-        currentPhase = phaseKey;
-        document.querySelectorAll('.phase-card').forEach(el => el.classList.remove('active'));
-        document.getElementById(`card_${phaseKey}`).classList.add('active');
+    function jumpPhase(dir) {
+        let idx = phaseOrder.indexOf(currentPhase||'warmup');
+        if(dir==='next') idx++; else idx--;
+        if(idx<0 || idx>=phaseOrder.length) return rawLog("Limit Reached");
         
-        // Apply Resistance
-        const res = phases[phaseKey].res;
-        log(`Entering ${phaseKey.toUpperCase()} (Lvl ${res})`);
-        setResistance(res);
+        const k = phaseOrder[idx];
+        phases[k].remainingSecs = phases[k].mins*60;
+        activatePhase(k);
+        refreshUI(); drawChart();
+        rawLog(`Jump > ${k}`);
+    }
+
+    function activatePhase(k) {
+        currentPhase = k;
+        document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
+        const c = document.getElementById(`card_${k}`);
+        if(c) c.classList.add('active');
+        
+        // 1. 強制重送 (Force Loop to send)
+        sentResistance = -99; 
+        targetResistance = phases[k].res;
+        
+        // 2. 強制更新儀表板 (Force UI update)
+        if(ui.res) ui.res.innerText = targetResistance;
+        
+        rawLog(`Phase ${k}. Target: ${targetResistance}`);
     }
 
     function timerLoop() {
         if(!currentPhase) return;
+        if(phases[currentPhase].remainingSecs > 0) phases[currentPhase].remainingSecs--;
+        else {
+            let idx = phaseOrder.indexOf(currentPhase);
+            if(idx < phaseOrder.length - 1) activatePhase(phaseOrder[idx+1]);
+            else { stopWorkout(); alert("Workout Finished!"); }
+        }
+        refreshUI(); drawChart();
+    }
+
+    // --- 5. DATA & UI ---
+    function adjTime(p, d) {
+        if(phases[p].mins+d < 1) return;
+        phases[p].mins += d;
+        if(currentStatus==='IDLE' || currentPhase!==p) phases[p].remainingSecs = phases[p].mins*60;
+        else {
+            phases[p].remainingSecs += (d*60);
+            if(phases[p].remainingSecs < 0) phases[p].remainingSecs = 0;
+        }
+        refreshUI(); drawChart();
+    }
+
+    function adjRes(p, d) {
+        phases[p].res += d;
+        if(phases[p].res<1) phases[p].res=1;
+        if(phases[p].res>32) phases[p].res=32;
         
-        // Decrement current phase
-        if (phases[currentPhase].remainingSecs > 0) {
-            phases[currentPhase].remainingSecs--;
-            globalElapsedTime++;
+        // Only update target immediately if this is the active phase
+        if(currentPhase===p) {
+            targetResistance = phases[p].res;
+            rawLog(`User Adj: Target ${targetResistance}`);
         }
-
-        // Check completion
-        if (phases[currentPhase].remainingSecs <= 0) {
-            nextPhase();
-        }
-
-        refreshUI(); // Update texts
-        drawChart(); // Animate chart
-    }
-
-    function nextPhase() {
-        if(currentPhase === 'warmup') activatePhase('workout1');
-        else if(currentPhase === 'workout1') activatePhase('workout2');
-        else if(currentPhase === 'workout2') activatePhase('cooldown');
-        else if(currentPhase === 'cooldown') {
-            stopWorkout();
-            alert("Workout Complete!");
-        }
-    }
-
-    function keeperLoop() {
-        if(currentStatus === 'RUNNING' && currentPhase) {
-            setResistanceInternal(phases[currentPhase].res);
-        }
-    }
-
-    // --- 5. Data & Control ---
-
-    async function setResistance(val) {
-        val = parseInt(val);
-        if(ui.res) ui.res.innerText = val;
-        lastCmdTime = Date.now();
-        await setResistanceInternal(val);
-    }
-
-    async function setResistanceInternal(val) {
-        if(!controlChar) return;
-        const buffer = new ArrayBuffer(3);
-        const view = new DataView(buffer);
-        view.setUint8(0, 0x04);
-        view.setUint16(1, val * 10, true); // Unit 0.1
-        try { await controlChar.writeValue(buffer); } catch(e){}
-    }
-
-    async function sendHex(b) {
-        if(controlChar) await controlChar.writeValue(new Uint8Array([b])).catch(()=>{});
+        refreshUI(); drawChart();
     }
 
     function parseData(e) {
-        const val = e.target.value;
-        const flags = val.getUint16(0, true);
-        let offset = 2;
+        const v = e.target.value;
+        const f = v.getUint16(0, true);
+        let off = 2;
+
+        // 1. Speed (Bit 0)
+        if(!(f&1)) { 
+            document.getElementById('spdVal').innerText = (v.getUint16(off,true)*0.01).toFixed(1); 
+            off+=2; 
+        }
+        // 2. Average Speed (Bit 1) - Skip
+        if(f&2) off+=2;
         
-        // Speed
-        if((flags & 0x01) === 0) {
-            ui.spd.innerText = (val.getUint16(offset, true)*0.01).toFixed(1);
-            offset+=2;
+        // 3. Cadence/RPM (Bit 2)
+        if(f&4) { 
+            document.getElementById('rpmVal').innerText = Math.floor(v.getUint16(off,true)*0.5); 
+            off+=2; 
         }
-        if(flags & 0x02) offset+=2;
-        // Cadence
-        if(flags & 0x04) {
-            ui.rpm.innerText = Math.floor(val.getUint16(offset, true)*0.5);
-            offset+=2;
+        // 4. Average Cadence (Bit 3) - Skip
+        if(f&8) off+=2;
+        // 5. Total Distance (Bit 4) - Skip (3 bytes)
+        if(f&16) off+=3;
+        
+        // 6. Resistance Level (Bit 5) --- [關鍵修改] ---
+        if(f&32) {
+            const realLevel = v.getInt16(off, true);
+            
+            // 只有當「距離上次發送指令超過 3 秒」才更新儀表板
+            // 這樣可以避免調整時數字亂跳，但平穩時又能顯示真實數據
+            if (Date.now() - lastCmdTime > 3000) {
+                if(ui.res) ui.res.innerText = realLevel;
+                // 如果需要，也可以在這裡反向更新 targetResistance，保持同步
+                // targetResistance = realLevel; 
+            }
+            off+=2;
         }
-        if(flags & 0x08) offset+=2;
-        if(flags & 0x10) offset+=3;
-        // Resistance
-        if(flags & 0x20) {
-            const r = val.getInt16(offset, true);
-            if(r > 0 && (Date.now() - lastCmdTime > 3000)) ui.res.innerText = r;
-            offset+=2;
-        }
-        // Power
-        if(flags & 0x40) {
-            ui.pwr.innerText = val.getInt16(offset, true);
-            offset+=2;
+        
+        // 7. Instantaneous Power (Bit 6)
+        if(f&64) {
+            document.getElementById('pwrVal').innerText = v.getInt16(off,true);
+            // off+=2;
         }
     }
-
-    // --- 6. Helpers & UI Updates ---
-
-    window.adjTime = function(p, delta) {
-        phases[p].mins += delta;
-        if(phases[p].mins < 1) phases[p].mins = 1;
-        // If IDLE, reset countdown immediately
-        if(currentStatus === 'IDLE') {
-            phases[p].remainingSecs = phases[p].mins * 60;
-            drawChart();
-        }
-        refreshUI();
-    };
-
-    window.adjRes = function(p, delta) {
-        phases[p].res += delta;
-        if(phases[p].res < 1) phases[p].res = 1;
-        if(phases[p].res > 32) phases[p].res = 32;
-        
-        if(currentStatus === 'RUNNING' && currentPhase === p) {
-            setResistance(phases[p].res);
-        }
-        refreshUI();
-        drawChart();
-    };
 
     function refreshUI() {
-        // Update Phase cards
+        let totalPlanMins = 0;
+        let totalRemainingSecs = 0;
+
         for(let k in phases) {
+            // 更新個別卡片
             document.getElementById(`val_res_${k}`).innerText = phases[k].res;
             document.getElementById(`val_time_${k}`).innerText = phases[k].mins;
-            document.getElementById(`timer_${k}`).innerText = fmtTime(phases[k].remainingSecs);
+            document.getElementById(`timer_${k}`).innerText = fmt(phases[k].remainingSecs);
+            
+            // 累加總數
+            totalPlanMins += phases[k].mins;
+            totalRemainingSecs += phases[k].remainingSecs;
         }
-        updateTotalLabel();
-    }
-
-    function updateTotalLabel() {
-        // Calculate Total Seconds based on Mins
-        let totalMins = phases.warmup.mins + phases.workout1.mins + phases.workout2.mins + phases.cooldown.mins;
-        let totalSecs = totalMins * 60;
         
-        ui.totalLabel.innerText = `Total Duration: ${totalMins} Min`;
+        // 1. 大數字顯示：總剩餘秒數 (倒數)
+        if(ui.globalTimer) ui.globalTimer.innerText = fmt(totalRemainingSecs);
         
-        // If IDLE, show total. If Running, show remaining or elapsed?
-        // Let's show Global Countdown
-        let remaining = phases.warmup.remainingSecs + phases.workout1.remainingSecs + phases.workout2.remainingSecs + phases.cooldown.remainingSecs;
-        ui.globalTimer.innerText = fmtTime(remaining);
-    }
+        // 2. 小標題顯示：總計畫分鐘數 (固定)
+        if(ui.totalLabel) ui.totalLabel.innerText = "Plan: " + totalPlanMins + " Mins";
 
-    function fmtTime(s) {
-        let m = Math.floor(s/60);
-        let sec = s%60;
+        // 3. 確保儀表板 Level 與目標一致 (如果正在運動中)
+        if(currentStatus !== 'IDLE' && ui.res) {
+            ui.res.innerText = targetResistance;
+        }
+    }
+    
+    function fmt(s) {
+        let m=Math.floor(s/60), sec=s%60;
         return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
     }
 
-    // --- 7. Chart Logic (Canvas) ---
-    
+    function updateBtns() {
+        if(currentStatus==='IDLE') { ui.startBtn.innerText="START"; ui.startBtn.style.background="#10b981"; }
+        else if(currentStatus==='RUNNING') { ui.startBtn.innerText="PAUSE"; ui.startBtn.style.background="#f59e0b"; }
+        else { ui.startBtn.innerText="RESUME"; ui.startBtn.style.background="#10b981"; }
+    }
+
+    // --- 6. UTILS ---
+    function loadSettings() {
+        try {
+            const saved = localStorage.getItem('horizon_v33');
+            if(saved) {
+                const p = JSON.parse(saved);
+                for(let k in phases) { if(p[k]) { phases[k].mins=p[k].mins; phases[k].res=p[k].res; }}
+                rawLog("Settings Restored.");
+            }
+        } catch(e) {}
+        resetTimers();
+    }
+
+    function saveSettings() {
+        try {
+            const toSave = {};
+            for(let k in phases) toSave[k] = { mins:phases[k].mins, res:phases[k].res };
+            localStorage.setItem('horizon_v33', JSON.stringify(toSave));
+        } catch(e) {}
+    }
+
+    function factoryReset() {
+        if(!confirm("Reset?")) return;
+        localStorage.removeItem('horizon_v33');
+        phases = JSON.parse(JSON.stringify(defaultPhases));
+        resetTimers(); refreshUI(); drawChart();
+        rawLog("Reset Done.");
+    }
+
+    function resetTimers() {
+        for(let k in phases) phases[k].remainingSecs = phases[k].mins * 60;
+        refreshUI();
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
     function resizeCanvas() {
-        const box = document.querySelector('.chart-box');
-        ui.canvas.width = box.clientWidth;
-        ui.canvas.height = box.clientHeight;
+        const b = ui.canvas.parentElement;
+        const d = window.devicePixelRatio||1;
+        ui.canvas.width = b.clientWidth*d;
+        ui.canvas.height = b.clientHeight*d;
+        ui.canvas.getContext('2d').scale(d,d);
     }
 
     function drawChart() {
         const ctx = ui.canvas.getContext('2d');
-        const W = ui.canvas.width;
-        const H = ui.canvas.height;
-        
-        // --- 1. 定義邊距 (Margins) ---
-        const padLeft = 35;   // 左邊留白給 Y 軸數字
-        const padBottom = 20; // 下面留白給 X 軸數字
-        const graphW = W - padLeft;
-        const graphH = H - padBottom;
-
-        // 清除畫面
+        const W = ui.canvas.width / (window.devicePixelRatio||1);
+        const H = ui.canvas.height / (window.devicePixelRatio||1);
         ctx.clearRect(0,0,W,H);
         
-        // --- 2. 計算比例 (Scales) ---
-        const pOrder = ['warmup', 'workout1', 'workout2', 'cooldown'];
-        let totalMins = 0;
-        pOrder.forEach(k => totalMins += phases[k].mins);
-        if(totalMins === 0) totalMins = 1;
+        let tm = 0; phaseOrder.forEach(k=>tm+=phases[k].mins);
+        if(tm===0) tm=1;
 
-        // X軸比例: 每一分鐘佔多少像素
-        const pxPerMin = graphW / totalMins;
-        // Y軸比例: 設定最大值為 35 (讓 32 有點空間)，每一 Level 佔多少像素
-        const maxLevel = 35;
-        const pxPerLevel = graphH / maxLevel;
+        const padL=30, padB=20;
+        const gw=W-padL, gh=H-padB;
+        const pxM = gw/tm;
+        const pxL = gh/35;
 
-        // --- 3. 繪製座標軸與格線 (Axes & Grid) ---
-        ctx.font = "10px monospace";
-        ctx.fillStyle = "#94a3b8"; // 文字顏色 (淡灰)
-        ctx.strokeStyle = "#334155"; // 格線顏色 (深灰)
-        ctx.lineWidth = 1;
-
-        // >> Y 軸 (Level)
-        ctx.textAlign = "right";
-        ctx.textBaseline = "middle";
-        // 每 5 級畫一條線
-        for(let l = 0; l <= maxLevel; l += 5) {
-            const y = graphH - (l * pxPerLevel); // 轉換 Y 座標 (Canvas 0 在上面)
-            
-            // 畫橫向格線
-            ctx.beginPath();
-            ctx.moveTo(padLeft, y);
-            ctx.lineTo(W, y);
-            ctx.stroke();
-
-            // 寫數字 (0, 5, 10...)
-            ctx.fillText(l, padLeft - 5, y);
+        // Grid
+        ctx.strokeStyle="#334155"; ctx.fillStyle="#94a3b8"; ctx.font="10px monospace";
+        ctx.textAlign="right"; ctx.textBaseline="middle";
+        for(let l=0; l<=35; l+=5) {
+            let y = gh - (l*pxL);
+            ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W,y); ctx.stroke();
+            ctx.fillText(l, padL-5, y);
         }
-        // Y軸單位
-        ctx.save();
-        ctx.fillStyle = "#64748b";
-        ctx.fillText("LVL", padLeft - 5, 10); // 寫在左上角
-        ctx.restore();
 
-        // >> X 軸 (Time)
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        // 動態決定刻度間距 (如果總時長很短就每 2 分鐘，不然每 5 分鐘)
-        const xStep = totalMins <= 15 ? 2 : 5;
-        
-        for(let t = 0; t <= totalMins; t += xStep) {
-            const x = padLeft + (t * pxPerMin);
-            
-            // 寫數字 (0, 5, 10...)
-            ctx.fillText(t, x, graphH + 4);
-            
-            // 畫下方小刻度
-            ctx.beginPath();
-            ctx.moveTo(x, graphH);
-            ctx.lineTo(x, graphH + 3);
-            ctx.stroke();
+        ctx.textAlign="center"; ctx.textBaseline="top";
+        let step = tm<=15?2:5;
+        for(let t=0; t<=tm; t+=step) {
+            let x = padL + (t*pxM);
+            ctx.fillText(t, x, gh+4);
         }
-        // X軸單位 (寫在右下角)
-        ctx.textAlign = "right";
-        ctx.fillText("MIN", W, graphH + 4);
 
-        // --- 4. 繪製計畫背景 (Plan - Gray) ---
-        let currentX = 0;
-        ctx.fillStyle = "#475569"; // 灰色柱狀圖
-
-        pOrder.forEach(k => {
-            const w = phases[k].mins * pxPerMin;
-            const h = phases[k].res * pxPerLevel;
+        let cx = 0;
+        phaseOrder.forEach(k=>{
+            const w = phases[k].mins*pxM;
+            const h = phases[k].res*pxL;
+            ctx.fillStyle="#475569"; ctx.fillRect(padL+cx, gh-h, w, h);
             
-            // 座標系統平移：X 要加上 padLeft，Y 要從 graphH 往上算
-            const x = padLeft + currentX;
-            const y = graphH - h;
-            
-            // 畫柱子
-            ctx.fillRect(x, y, w, h);
-            
-            // 畫階段分隔線 (垂直白線)
-            ctx.beginPath();
-            ctx.strokeStyle = "#1e293b"; 
-            ctx.moveTo(x + w, 0); 
-            ctx.lineTo(x + w, graphH);
-            ctx.stroke();
-
-            currentX += w;
-        });
-
-        // --- 5. 繪製進度 (Progress - Blue) ---
-        ctx.fillStyle = "rgba(59, 130, 246, 0.7)"; // 藍色半透明
-        let progressX = 0;
-
-        pOrder.forEach(k => {
-            const p = phases[k];
-            const durationSec = p.mins * 60;
-            // 計算這個階段過了多少秒
-            const elapsedSec = durationSec - p.remainingSecs;
-            
-            const wFull = p.mins * pxPerMin;
-            const h = p.res * pxPerLevel;
-            const y = graphH - h; // 同樣要反轉 Y
-
-            if(elapsedSec > 0) {
-                // 依比例計算寬度
-                const wProgress = (elapsedSec / durationSec) * wFull;
-                // 注意 X 也要加上 padLeft
-                ctx.fillRect(padLeft + progressX, y, wProgress, h);
+            const dur = phases[k].mins*60;
+            const elap = dur - phases[k].remainingSecs;
+            if(elap>0) {
+                ctx.fillStyle="rgba(59,130,246,0.7)";
+                ctx.fillRect(padL+cx, gh-h, (elap/dur)*w, h);
             }
-            
-            progressX += wFull;
+            cx+=w;
         });
     }
-    
-    // Run Init
-    init();
-
 </script>
 </body>
 </html>
-
