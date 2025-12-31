@@ -2,8 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V38 (Light Mode)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Horizon V39 (Safe Layout)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -12,9 +11,12 @@
                 const ln = document.createElement('div');
                 const ts = new Date().toLocaleTimeString().split(' ')[0];
                 ln.textContent = `[${ts}] ${msg}`;
-                if(type==='err') ln.className = 'log-err';
-                if(type==='tx') ln.className = 'log-tx';
-                if(type==='succ') ln.className = 'log-succ';
+                // 直接寫死顏色，不依賴 class
+                if(type==='err') ln.style.color = 'red';
+                else if(type==='tx') ln.style.color = 'blue';
+                else if(type==='succ') ln.style.color = 'green';
+                else ln.style.color = '#333';
+                
                 el.appendChild(ln);
                 el.scrollTop = el.scrollHeight;
             }
@@ -25,94 +27,380 @@
     </script>
 
     <style>
-        /* --- CHANGED TO LIGHT THEME --- */
-        :root {
-            --bg: #ffffff;           /* White Background */
-            --sidebar: #f1f5f9;      /* Light Gray Sidebar */
-            --surface: #e2e8f0;      /* Darker Gray Cards */
-            --primary: #2563eb;      /* Darker Blue for visibility */
-            --text: #0f172a;         /* Dark Black Text */
-            --text-muted: #475569;   /* Muted Text */
-            
-            /* Metric Colors (Darker for white bg) */
-            --c-rpm: #059669; 
-            --c-pwr: #d97706; 
-            --c-spd: #0891b2; 
-            --c-res: #db2777;
-        }
+        /* V39: 極簡安全樣式 (Fail-Safe CSS) */
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: var(--bg); color: var(--text);
-            margin: 0; padding: 0; height: 100vh; display: flex; overflow: hidden;
-            -webkit-font-smoothing: antialiased;
+            background-color: #ffffff !important; /* 強制白色背景 */
+            color: #000000 !important; /* 強制黑色文字 */
+            font-family: sans-serif;
+            margin: 0;
+            padding: 10px;
+            overflow: auto; /* 允許捲動 */
         }
 
-        /* Console (Keep dark for contrast) */
+        /* 儀表板區域 */
+        .dashboard-container {
+            border: 2px solid #000;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background: #f0f0f0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* 4欄 */
+            gap: 5px;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .stat-box {
+            background: #fff;
+            border: 1px solid #999;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .stat-val { font-size: 20px; font-weight: bold; display: block; }
+        .stat-label { font-size: 10px; color: #555; }
+
+        /* 按鈕區域 */
+        .btn-row {
+            display: flex; gap: 5px; margin-bottom: 5px;
+        }
+        button {
+            padding: 10px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            border: 1px solid #000;
+            border-radius: 4px;
+            background: #ddd;
+            color: #000;
+        }
+        #connectBtn { background: #aaf; width: 100%; display: block; margin-bottom: 5px; }
+        #startBtn { background: #afa; width: 100%; display: block; margin-bottom: 5px; }
+        #stopBtn { background: #faa; width: 100%; display: block; margin-bottom: 5px; }
+
+        /* 圖表區域 */
+        .chart-container {
+            width: 100%;
+            height: 200px;
+            border: 2px solid #000;
+            background: #fff;
+            margin-bottom: 20px;
+        }
+        canvas { width: 100%; height: 100%; }
+
+        /* 階段列表 */
+        .phase-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .phase-item {
+            border: 1px solid #ccc;
+            padding: 10px;
+            background: #fff;
+        }
+        .phase-item.active {
+            border: 3px solid blue;
+            background: #eef;
+        }
+        .ctrl-row {
+            display: flex; justify-content: space-between; align-items: center; margin-top: 5px;
+        }
+        .ctrl-group {
+            display: flex; align-items: center; gap: 5px; background: #eee; padding: 3px; border-radius: 4px;
+        }
+        .tiny-btn {
+            width: 25px; height: 25px; background: #999; color: white; border: none; border-radius: 50%;
+        }
+
+        /* Console - 改為靜態顯示在底部 */
         #debug-console {
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 160px;
-            background: #000; color: #0f0; border-top: 2px solid #555; /* Matrix Green */
-            font-size: 12px; padding: 10px; overflow-y: scroll; font-family: monospace;
-            z-index: 99999; box-sizing: border-box; white-space: pre-wrap;
+            width: 100%;
+            height: 150px;
+            background: #eee;
+            border: 2px solid #333;
+            overflow-y: scroll;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 5px;
+            margin-top: 20px;
         }
-        .log-err { color: #ff5555; font-weight: bold; }
-        .log-tx { color: #ffff55; } 
-        .log-succ { color: #55ff55; } 
+    </style>
+</head>
+<body>
 
-        /* Layout */
-        .app-container { display: flex; width: 100%; height: 100%; }
+    <div class="dashboard-container">
+        <div style="margin-bottom: 5px; font-weight: bold;">HORIZON V39 (SAFE MODE)</div>
+        <div id="btStatus" style="margin-bottom: 10px; color: blue;">Waiting...</div>
+
+        <div class="stats-grid">
+            <div class="stat-box"><span id="rpmVal" class="stat-val">0</span><span class="stat-label">RPM</span></div>
+            <div class="stat-box"><span id="pwrVal" class="stat-val">0</span><span class="stat-label">WATT</span></div>
+            <div class="stat-box"><span id="spdVal" class="stat-val">0.0</span><span class="stat-label">KMH</span></div>
+            <div class="stat-box"><span id="resVal" class="stat-val">--</span><span class="stat-label">LEVEL</span></div>
+        </div>
+
+        <button id="connectBtn">Connect Bluetooth</button>
+        <button id="startBtn">START WORKOUT</button>
+        <div class="btn-row">
+            <button id="prevBtn" style="flex:1">&lt; Prev</button>
+            <button id="nextBtn" style="flex:1">Next &gt;</button>
+        </div>
+        <button id="stopBtn">STOP</button>
+        <button id="resetBtn" style="width:100%">Factory Reset</button>
+    </div>
+
+    <div style="text-align: center; margin-bottom: 10px;">
+        <div id="globalTimer" style="font-size: 40px; font-weight: bold;">00:00</div>
+        <div id="totalLabel">Total Remaining</div>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="workoutChart"></canvas>
+    </div>
+
+    <div class="phase-list">
+        <div id="card_warmup" class="phase-item">
+            <div style="display:flex; justify-content:space-between; font-weight:bold;">
+                <span>WARM UP</span>
+                <span id="timer_warmup">00:00</span>
+            </div>
+            <div class="ctrl-row">
+                <div class="ctrl-group">
+                    <span>Res:</span>
+                    <button id="btn_warmup_res_minus" class="tiny-btn">-</button>
+                    <span id="val_res_warmup">--</span>
+                    <button id="btn_warmup_res_plus" class="tiny-btn">+</button>
+                </div>
+                <div class="ctrl-group">
+                    <span>Min:</span>
+                    <button id="btn_warmup_time_minus" class="tiny-btn">-</button>
+                    <span id="val_time_warmup">--</span>
+                    <button id="btn_warmup_time_plus" class="tiny-btn">+</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="card_workout1" class="phase-item">
+            <div style="display:flex; justify-content:space-between; font-weight:bold;">
+                <span>WORKOUT 1</span>
+                <span id="timer_workout1">00:00</span>
+            </div>
+            <div class="ctrl-row">
+                <div class="ctrl-group">
+                    <span>Res:</span>
+                    <button id="btn_workout1_res_minus" class="tiny-btn">-</button>
+                    <span id="val_res_workout1">--</span>
+                    <button id="btn_workout1_res_plus" class="tiny-btn">+</button>
+                </div>
+                <div class="ctrl-group">
+                    <span>Min:</span>
+                    <button id="btn_workout1_time_minus" class="tiny-btn">-</button>
+                    <span id="val_time_workout1">--</span>
+                    <button id="btn_workout1_time_plus" class="tiny-btn">+</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="card_workout2" class="phase-item">
+            <div style="display:flex; justify-content:space-between; font-weight:bold;">
+                <span>WORKOUT 2</span>
+                <span id="timer_workout2">00:00</span>
+            </div>
+            <div class="ctrl-row">
+                <div class="ctrl-group">
+                    <span>Res:</span>
+                    <button id="btn_workout2_res_minus" class="tiny-btn">-</button>
+                    <span id="val_res_workout2">--</span>
+                    <button id="btn_workout2_res_plus" class="tiny-btn">+</button>
+                </div>
+                <div class="ctrl-group">
+                    <span>Min:</span>
+                    <button id="btn_workout2_time_minus" class="tiny-btn">-</button>
+                    <span id="val_time_workout2">--</span>
+                    <button id="btn_workout2_time_plus" class="tiny-btn">+</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="card_cooldown" class="phase-item">
+            <div style="display:flex; justify-content:space-between; font-weight:bold;">
+                <span>COOL DOWN</span>
+                <span id="timer_cooldown">00:00</span>
+            </div>
+            <div class="ctrl-row">
+                <div class="ctrl-group">
+                    <span>Res:</span>
+                    <button id="btn_cooldown_res_minus" class="tiny-btn">-</button>
+                    <span id="val_res_cooldown">--</span>
+                    <button id="btn_cooldown_res_plus" class="tiny-btn">+</button>
+                </div>
+                <div class="ctrl-group">
+                    <span>Min:</span>
+                    <button id="btn_cooldown_time_minus" class="tiny-btn">-</button>
+                    <span id="val_time_cooldown">--</span>
+                    <button id="btn_cooldown_time_plus" class="tiny-btn">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div style="font-weight:bold;">Debug Log:</div>
+    <div id="debug-console">V39 Safe Mode Loaded.</div>
+
+
+<script>
+    // --- 1. CONFIG & STATE ---
+    const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
+    const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
+    const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
+
+    let controlChar = null;
+    let currentStatus = 'IDLE'; 
+    let currentPhase = null; 
+    const phaseOrder = ['warmup', 'workout1', 'workout2', 'cooldown'];
+    
+    // Traffic Control
+    let targetResistance = 1; 
+    let sentResistance = -99; 
+    let isWriting = false;    
+    let syncInterval = null;
+    let workoutInterval;
+
+    // Time Tracking
+    let totalElapsed = 0; 
+
+    const defaultPhases = {
+        warmup:   { mins: 3,  res: 15 },
+        workout1: { mins: 7,  res: 22 },
+        workout2: { mins: 8,  res: 25 },
+        cooldown: { mins: 3,  res: 10 }
+    };
+    let phases = JSON.parse(JSON.stringify(defaultPhases));
+    let ui = {};
+
+    // --- 2. STARTUP ---
+    window.onload = function() {
+        try { initApp(); } 
+        catch(e) { rawLog(`INIT ERROR: ${e.message}`, 'err'); }
+    };
+
+    function initApp() {
+        ui = {
+            btStatus: document.getElementById('btStatus'),
+            connectBtn: document.getElementById('connectBtn'),
+            startBtn: document.getElementById('startBtn'),
+            canvas: document.getElementById('workoutChart'),
+            totalLabel: document.getElementById('totalLabel'),
+            globalTimer: document.getElementById('globalTimer'),
+            res: document.getElementById('resVal')
+        };
+
+        if(!ui.connectBtn) throw new Error("UI Load Fail");
+
+        safeBind('connectBtn', startScan);
+        safeBind('startBtn', toggleWorkout);
+        safeBind('stopBtn', stopWorkout);
+        safeBind('resetBtn', factoryReset);
+        safeBind('prevBtn', () => jumpPhase('prev'));
+        safeBind('nextBtn', () => jumpPhase('next'));
+
+        ['warmup', 'workout1', 'workout2', 'cooldown'].forEach(key => {
+            safeBind(`btn_${key}_res_minus`, () => adjRes(key, -1));
+            safeBind(`btn_${key}_res_plus`, () => adjRes(key, 1));
+            safeBind(`btn_${key}_time_minus`, () => adjTime(key, -1));
+            safeBind(`btn_${key}_time_plus`, () => adjTime(key, 1));
+        });
+
+        loadSettings();
+        refreshUI();
         
-        .sidebar {
-            width: 320px; background: var(--sidebar); padding: 20px; 
-            display: flex; flex-direction: column; border-right: 1px solid #cbd5e1;
-            flex-shrink: 0; overflow-y: auto;
-            padding-bottom: 180px; 
+        // Show Last Device
+        const lastDev = localStorage.getItem('last_device_name');
+        if(lastDev) {
+            rawLog(`Last Device: ${lastDev}`);
+            ui.btStatus.innerText = `Last Device: ${lastDev}`;
         }
         
-        .content {
-            flex: 1; padding: 20px; overflow-y: auto; position: relative;
-            display: flex; flex-direction: column; align-items: center;
-            padding-bottom: 220px; 
-        }
+        if(syncInterval) clearInterval(syncInterval);
+        syncInterval = setInterval(bleSyncLoop, 250);
 
-        @media (max-width: 820px) {
-            .app-container { flex-direction: column; }
-            .sidebar { width: 100%; border-right: none; height: auto; flex-shrink: 0; padding-bottom: 20px; }
-            .content { width: 100%; box-sizing: border-box; }
-        }
-
-        /* UI */
-        .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .mini-card { background: var(--surface); padding: 10px; border-radius: 12px; text-align: center; border: 1px solid #cbd5e1; }
-        .mini-val { font-size: 24px; font-weight: 800; }
-        .mini-lbl { font-size: 10px; color: var(--text-muted); font-weight: bold; }
-        .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } 
-        .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
-
-        .main-btn {
-            width: 100%; padding: 15px; margin-bottom: 10px; border-radius: 10px; border: none; 
-            font-weight: bold; font-size: 16px; color: white; cursor: pointer;
-        }
-        .btn-connect { background: var(--primary); }
-        .btn-start { background: #059669; }
-        .btn-stop { background: #dc2626; }
+        setTimeout(() => { resizeCanvas(); drawChart(); }, 300);
+        window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
         
-        .jump-row { display: flex; gap: 10px; margin-bottom: 10px; }
-        .btn-jump { flex: 1; background: #cbd5e1; color: #333; border: none; padding: 12px; border-radius: 8px; font-weight:bold; }
+        rawLog("System Ready (Safe Mode).");
+    }
 
-        .chart-box {
-            width: 100%; max-width: 600px; height: 200px; 
-            background: #ffffff; border: 2px solid #cbd5e1; border-radius: 12px; margin-bottom: 20px;
-            flex-shrink: 0; 
+    function safeBind(id, fn) {
+        const el = document.getElementById(id);
+        if(el) el.addEventListener('click', fn);
+    }
+
+    // --- 3. BLUETOOTH CORE ---
+    async function startScan() {
+        if(!navigator.bluetooth) return alert("Browser not supported");
+        try {
+            ui.connectBtn.innerText = "Scanning...";
+            const dev = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true, 
+                optionalServices: [FTMS_UUID]
+            });
+            
+            rawLog(`Device: ${dev.name} (${dev.id})`);
+            
+            // Save Device Info
+            localStorage.setItem('last_device_name', dev.name);
+            localStorage.setItem('last_device_id', dev.id);
+            
+            dev.addEventListener('gattserverdisconnected', onDisconnect);
+            const server = await dev.gatt.connect();
+            const svc = await server.getPrimaryService(FTMS_UUID);
+            controlChar = await svc.getCharacteristic(CTRL_UUID);
+            const dataChar = await svc.getCharacteristic(DATA_UUID);
+            
+            await dataChar.startNotifications();
+            dataChar.addEventListener('characteristicvaluechanged', parseData);
+
+            rawLog("Handshake: Request Control...", 'tx');
+            await sendHexDirect(0x00); 
+            await sleep(200); 
+            
+            rawLog("Handshake: Start/Resume...", 'tx');
+            await sendHexDirect(0x07);
+            await sleep(200);
+
+            ui.btStatus.innerText = "Connected: " + dev.name;
+            ui.btStatus.style.color = "green";
+            ui.connectBtn.style.display = 'none';
+            rawLog("Connected!", 'succ');
+            
+        } catch(e) {
+            ui.connectBtn.innerText = "Connect Bluetooth";
+            rawLog(`Connect Fail: ${e.message}`, 'err');
         }
-        canvas { width: 100%; height: 100%; display: block; }
+    }
 
-        .global-timer { font-size: 48px; font-weight: bold; margin-bottom: 5px; color: #000; }
+    async function bleSyncLoop() {
+        if(!controlChar || isWriting) return;
         
-        .phase-list { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px; }
-        .phase-card { background: #ffffff; padding: 15px; border-radius: 12px; border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .phase-card.active { border-color: var(--primary); background: #eff6ff; border-width: 2px; }
-        .phase-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; }
-        
-        .controls-row { display: flex; gap: 10px; }
-        .control-group { background: #f1f5f9; padding: 5px; border-radius: 8px; flex: 1; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; }
-        .ctrl-btn { width: 30px
+        if(targetResistance !== sentResistance) {
+            isWriting = true;
+            try {
+                rawLog(`TX Level: ${targetResistance}...`, 'tx');
+                
+                const buf = new ArrayBuffer(3);
+                const v = new DataView(buf);
+                v.setUint8(0, 0x04); 
+                v.setUint16(1, targetResistance * 10, true); 
+                
+                await controlChar.writeValue(buf);
+                
+                sentResistance = targetResistance;
+                rawLog(`TX Success: Lvl ${targetResistance}`, 'succ');
+                
+            } catch(e) {
+                rawLog(`TX Busy/Fail: ${e.message}`, 'err');
+            } finally {
