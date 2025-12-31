@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V35 (Manual Bug Fix)</title>
+    <title>Horizon V35.1 (Manual Bug Fix)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -57,13 +57,12 @@
             width: 320px; background: var(--sidebar); padding: 20px; 
             display: flex; flex-direction: column; border-right: 1px solid #475569;
             flex-shrink: 0; overflow-y: auto;
-            padding-bottom: 250px; 
+            padding-bottom: 250px; /* Fix: Space for console */
         }
-        
         .content {
             flex: 1; padding: 20px; overflow-y: auto; position: relative;
             display: flex; flex-direction: column; align-items: center;
-            padding-bottom: 250px;
+            padding-bottom: 250px; /* Fix: Space for console */
         }
 
         @media (max-width: 820px) {
@@ -110,7 +109,7 @@
 </head>
 <body>
 
-<div id="debug-console">V35 Init...</div>
+<div id="debug-console">V35.1 Init...</div>
 
 <div class="app-container">
     <div class="sidebar">
@@ -330,31 +329,42 @@
         }
     }
 
-    // Traffic Control Loop
+    // Traffic Control Loop (Fixed)
+    let lastWriteTime = 0;
+
     async function bleSyncLoop() {
-        if(!controlChar || isWriting) return;
+        if(!controlChar) return;
+
+        // Deadlock Breaker: If stuck writing for > 1s, force release
+        if(isWriting && (Date.now() - lastWriteTime > 1000)) {
+            isWriting = false;
+            // rawLog("Auto-released lock", 'err');
+        }
+
+        if(isWriting) return;
         
-        // If Logic mismatch
         if(targetResistance !== sentResistance) {
             isWriting = true;
+            lastWriteTime = Date.now();
+            
             try {
-                // FIX: Update Dashboard Level immediately
+                // FIX: Update UI immediately to match target
                 if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
 
-                rawLog(`TX Level: ${targetResistance}...`, 'tx');
+                rawLog(`TX Level: ${targetResistance}`, 'tx');
                 
                 const buf = new ArrayBuffer(3);
                 const v = new DataView(buf);
-                v.setUint8(0, 0x04); // Set Resistance OpCode
-                v.setUint16(1, targetResistance * 10, true); // Unit 0.1
+                v.setUint8(0, 0x04); 
+                v.setUint16(1, targetResistance * 10, true); 
                 
                 await controlChar.writeValue(buf);
                 
                 sentResistance = targetResistance;
-                rawLog(`TX Success: Lvl ${targetResistance}`, 'succ');
+                // rawLog(`TX OK`, 'succ');
                 
             } catch(e) {
-                rawLog(`TX Busy/Fail: ${e.message}`, 'err');
+                // rawLog(`TX Fail`, 'err');
             } finally {
                 isWriting = false;
             }
@@ -445,11 +455,14 @@
         const c = document.getElementById(`card_${k}`);
         if(c) c.classList.add('active');
         
-        // CRITICAL FIX: Force resend even if level is same
+        // Force loop to send
         sentResistance = -99; 
         targetResistance = phases[k].res;
         
-        rawLog(`Phase ${k} Active. Target: ${targetResistance}`);
+        // Force UI update
+        if(ui.res) ui.res.innerText = targetResistance;
+        
+        rawLog(`Phase ${k}. Target: ${targetResistance}`);
     }
 
     function timerLoop() {
@@ -515,18 +528,18 @@
             tm += phases[k].mins; tr += phases[k].remainingSecs;
         }
         
-        // FIX 1: Global Timer shows Countdown (tr)
+        // FIX: Global Timer is Countdown
         if(ui.globalTimer) ui.globalTimer.innerText = fmt(tr);
         
-        // FIX 2: Total Label shows Plan Duration (tm)
+        // FIX: Label is Total Plan
         if(ui.totalLabel) ui.totalLabel.innerText = "Plan: " + tm + " Mins";
 
-        // FIX 3: Ensure dashboard shows target level during phase changes
+        // FIX: Sync Dashboard Level if Active
         if(currentStatus !== 'IDLE' && ui.res) {
             ui.res.innerText = targetResistance;
         }
     }
-
+    
     function fmt(s) {
         let m=Math.floor(s/60), sec=s%60;
         return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
@@ -630,3 +643,4 @@
 </script>
 </body>
 </html>
+
