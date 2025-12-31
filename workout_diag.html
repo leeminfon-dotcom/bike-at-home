@@ -1,21 +1,22 @@
-
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V35.3 (Manual Bug Fix)</title>
+    <title>Horizon V35.4 (Debug Mode)</title>
     
     <script>
         function rawLog(msg, type='info') {
             const el = document.getElementById('debug-console');
             if(el) {
                 const ln = document.createElement('div');
-                const ts = new Date().toLocaleTimeString().split(' ')[0];
+                const d = new Date();
+                const ts = `${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}.${d.getMilliseconds()}`;
                 ln.textContent = `[${ts}] ${msg}`;
                 if(type==='err') ln.className = 'log-err';
                 if(type==='tx') ln.className = 'log-tx';
                 if(type==='succ') ln.className = 'log-succ';
+                if(type==='dbg') ln.className = 'log-dbg';
                 el.appendChild(ln);
                 el.scrollTop = el.scrollHeight;
             }
@@ -40,29 +41,29 @@
 
         /* Console */
         #debug-console {
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 160px;
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 200px; /* Bigger for debug */
             background: rgba(0,0,0,0.95); color: #ccc; border-top: 2px solid #555;
-            font-size: 11px; padding: 10px; overflow-y: scroll; font-family: monospace;
+            font-size: 10px; padding: 10px; overflow-y: scroll; font-family: monospace;
             z-index: 99999; box-sizing: border-box; white-space: pre-wrap;
         }
         .log-err { color: #ff5555; font-weight: bold; }
-        .log-tx { color: #ffff55; } /* Yellow for sending */
-        .log-succ { color: #55ff55; } /* Green for success */
+        .log-tx { color: #ffff55; } 
+        .log-succ { color: #55ff55; } 
+        .log-dbg { color: #aaaaff; }
 
         /* Layout */
-        /* FIX: Increased padding to 250px to show Cool Down */
         .app-container { display: flex; width: 100%; height: 100%; }
         
         .sidebar {
             width: 320px; background: var(--sidebar); padding: 20px; 
             display: flex; flex-direction: column; border-right: 1px solid #475569;
             flex-shrink: 0; overflow-y: auto;
-            padding-bottom: 250px; /* Fix: Space for console */
+            padding-bottom: 250px; 
         }
         .content {
             flex: 1; padding: 20px; overflow-y: auto; position: relative;
             display: flex; flex-direction: column; align-items: center;
-            padding-bottom: 250px; /* Fix: Space for console */
+            padding-bottom: 250px; 
         }
 
         @media (max-width: 820px) {
@@ -109,11 +110,11 @@
 </head>
 <body>
 
-<div id="debug-console">V35.3 Init...</div>
+<div id="debug-console">V35.4 Debug Init...</div>
 
 <div class="app-container">
     <div class="sidebar">
-        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35.3</div>
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35.4</div>
         <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
 
         <div class="dash-grid">
@@ -221,7 +222,7 @@
     let targetResistance = 1; 
     let sentResistance = -99; 
     let isWriting = false;    
-    let lastCmdTime = 0; // [新增] 記錄最後一次發送指令的時間
+    let lastCmdTime = 0; 
     let syncInterval = null;
     let workoutInterval;
 
@@ -241,18 +242,19 @@
     };
 
     function initApp() {
+        rawLog("[DEBUG] App Initializing...", 'dbg');
         ui = {
             btStatus: document.getElementById('btStatus'),
             connectBtn: document.getElementById('connectBtn'),
             startBtn: document.getElementById('startBtn'),
             canvas: document.getElementById('workoutChart'),
-            totalLabel: document.getElementById('totalLabel'), // Fixed mapping
+            totalLabel: document.getElementById('totalLabel'),
+            globalTimer: document.getElementById('globalTimer'),
             res: document.getElementById('resVal')
         };
 
         if(!ui.connectBtn) throw new Error("UI Load Fail");
 
-        // Event Binding
         safeBind('connectBtn', startScan);
         safeBind('startBtn', toggleWorkout);
         safeBind('stopBtn', stopWorkout);
@@ -270,9 +272,9 @@
         loadSettings();
         refreshUI();
         
-        // Start Sync Loop (Always running to catch manual changes)
         if(syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(bleSyncLoop, 250);
+        rawLog("[DEBUG] Sync Loop Started (250ms)", 'dbg');
 
         setTimeout(() => { resizeCanvas(); drawChart(); }, 300);
         window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
@@ -297,7 +299,6 @@
             
             rawLog(`Device: ${dev.name} (${dev.id})`);
             
-            // Store Connection Info
             localStorage.setItem('last_device_name', dev.name);
             localStorage.setItem('last_device_id', dev.id);
 
@@ -307,15 +308,14 @@
             controlChar = await svc.getCharacteristic(CTRL_UUID);
             const dataChar = await svc.getCharacteristic(DATA_UUID);
             
+            rawLog("[DEBUG] Characteristics Found", 'dbg');
+
             await dataChar.startNotifications();
             dataChar.addEventListener('characteristicvaluechanged', parseData);
 
-            // Handshake Sequence (Slower for reliability)
-            rawLog("Handshake: Request Control...", 'tx');
+            rawLog("Handshake...", 'tx');
             await sendHexDirect(0x00); 
             await sleep(200); 
-            
-            rawLog("Handshake: Start/Resume...", 'tx');
             await sendHexDirect(0x07);
             await sleep(200);
 
@@ -331,28 +331,29 @@
     }
 
     // Traffic Control Loop (Fixed)
-    let lastWriteTime = 0; // 新增變數記錄時間
+    let lastWriteTime = 0;
 
     async function bleSyncLoop() {
+        // [DEBUG] Check loop aliveness (spammy, so uncomment only if needed)
+        // rawLog('.', 'dbg'); 
+
         if(!controlChar) return;
 
-        // 【防死鎖機制】如果寫入卡住超過 1000ms (1秒)，強制解鎖
         if(isWriting && (Date.now() - lastWriteTime > 1000)) {
-            isWriting = false; 
-            // rawLog("Auto-released lock", 'err'); // 測試用，可註解
+            isWriting = false;
+            rawLog("[DEBUG] Deadlock Auto-Released", 'err');
         }
 
         if(isWriting) return;
         
         if(targetResistance !== sentResistance) {
             isWriting = true;
-            lastWriteTime = Date.now(); // 記錄開始寫入的時間
+            lastWriteTime = Date.now();
             
             try {
-                // 1. 介面同步：發送前先更新儀表板數字 (Optimistic UI)
                 if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
 
-                rawLog(`TX Level: ${targetResistance}`, 'tx');
+                rawLog(`[DEBUG] Write Start: ${targetResistance}`, 'tx');
                 
                 const buf = new ArrayBuffer(3);
                 const v = new DataView(buf);
@@ -362,12 +363,11 @@
                 await controlChar.writeValue(buf);
 
                 lastCmdTime = Date.now();
-                
                 sentResistance = targetResistance;
-                // rawLog(`TX OK`, 'succ');
+                rawLog(`[DEBUG] Write Success: ${targetResistance}`, 'succ');
                 
             } catch(e) {
-                // rawLog(`TX Fail: ${e.message}`, 'err');
+                rawLog(`[DEBUG] Write Fail: ${e.message}`, 'err');
             } finally {
                 isWriting = false;
             }
@@ -397,7 +397,7 @@
         saveSettings();
         if(!controlChar) rawLog("Demo Mode (No Device)", 'err');
         
-        sendHexDirect(0x07); // Ensure Wake
+        sendHexDirect(0x07); 
         
         if(!currentPhase) currentPhase = 'warmup';
         currentStatus = 'RUNNING';
@@ -421,7 +421,7 @@
         currentStatus = 'RUNNING';
         updateBtns();
         workoutInterval = setInterval(timerLoop, 1000);
-        sentResistance = -99; // Force resend on resume
+        sentResistance = -99; 
         rawLog("Resumed.");
     }
 
@@ -433,7 +433,6 @@
         document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
         resetTimers(); refreshUI();
         
-        // Reset Bike
         targetResistance = 1; 
         
         saveSettings(); drawChart();
@@ -458,14 +457,12 @@
         const c = document.getElementById(`card_${k}`);
         if(c) c.classList.add('active');
         
-        // 1. 強制重送 (Force Loop to send)
         sentResistance = -99; 
         targetResistance = phases[k].res;
         
-        // 2. 強制更新儀表板 (Force UI update)
         if(ui.res) ui.res.innerText = targetResistance;
         
-        rawLog(`Phase ${k}. Target: ${targetResistance}`);
+        rawLog(`[DEBUG] Phase Switch: ${k}, Target: ${targetResistance}`);
     }
 
     function timerLoop() {
@@ -496,10 +493,9 @@
         if(phases[p].res<1) phases[p].res=1;
         if(phases[p].res>32) phases[p].res=32;
         
-        // Only update target immediately if this is the active phase
         if(currentPhase===p) {
             targetResistance = phases[p].res;
-            rawLog(`User Adj: Target ${targetResistance}`);
+            rawLog(`[DEBUG] Manual Adj: Target ${targetResistance}`);
         }
         refreshUI(); drawChart();
     }
@@ -509,42 +505,30 @@
         const f = v.getUint16(0, true);
         let off = 2;
 
-        // 1. Speed (Bit 0)
         if(!(f&1)) { 
             document.getElementById('spdVal').innerText = (v.getUint16(off,true)*0.01).toFixed(1); 
             off+=2; 
         }
-        // 2. Average Speed (Bit 1) - Skip
         if(f&2) off+=2;
         
-        // 3. Cadence/RPM (Bit 2)
         if(f&4) { 
             document.getElementById('rpmVal').innerText = Math.floor(v.getUint16(off,true)*0.5); 
             off+=2; 
         }
-        // 4. Average Cadence (Bit 3) - Skip
         if(f&8) off+=2;
-        // 5. Total Distance (Bit 4) - Skip (3 bytes)
         if(f&16) off+=3;
         
-        // 6. Resistance Level (Bit 5) --- [關鍵修改] ---
         if(f&32) {
             const realLevel = v.getInt16(off, true);
             
-            // 只有當「距離上次發送指令超過 3 秒」才更新儀表板
-            // 這樣可以避免調整時數字亂跳，但平穩時又能顯示真實數據
             if (Date.now() - lastCmdTime > 3000) {
                 if(ui.res) ui.res.innerText = realLevel;
-                // 如果需要，也可以在這裡反向更新 targetResistance，保持同步
-                // targetResistance = realLevel; 
             }
             off+=2;
         }
         
-        // 7. Instantaneous Power (Bit 6)
         if(f&64) {
             document.getElementById('pwrVal').innerText = v.getInt16(off,true);
-            // off+=2;
         }
     }
 
@@ -553,23 +537,17 @@
         let totalRemainingSecs = 0;
 
         for(let k in phases) {
-            // 更新個別卡片
             document.getElementById(`val_res_${k}`).innerText = phases[k].res;
             document.getElementById(`val_time_${k}`).innerText = phases[k].mins;
             document.getElementById(`timer_${k}`).innerText = fmt(phases[k].remainingSecs);
             
-            // 累加總數
             totalPlanMins += phases[k].mins;
             totalRemainingSecs += phases[k].remainingSecs;
         }
         
-        // 1. 大數字顯示：總剩餘秒數 (倒數)
         if(ui.globalTimer) ui.globalTimer.innerText = fmt(totalRemainingSecs);
-        
-        // 2. 小標題顯示：總計畫分鐘數 (固定)
         if(ui.totalLabel) ui.totalLabel.innerText = "Plan: " + totalPlanMins + " Mins";
 
-        // 3. 確保儀表板 Level 與目標一致 (如果正在運動中)
         if(currentStatus !== 'IDLE' && ui.res) {
             ui.res.innerText = targetResistance;
         }
@@ -593,7 +571,7 @@
             if(saved) {
                 const p = JSON.parse(saved);
                 for(let k in phases) { if(p[k]) { phases[k].mins=p[k].mins; phases[k].res=p[k].res; }}
-                rawLog("Settings Restored.");
+                rawLog("Settings Restored.", 'dbg');
             }
         } catch(e) {}
         resetTimers();
@@ -616,7 +594,11 @@
     }
 
     function resetTimers() {
-        for(let k in phases) phases[k].remainingSecs = phases[k].mins * 60;
+        rawLog("[DEBUG] Resetting Timers...", 'dbg');
+        for(let k in phases) {
+            phases[k].remainingSecs = phases[k].mins * 60;
+            // rawLog(`  ${k}: ${phases[k].remainingSecs}s`, 'dbg');
+        }
         refreshUI();
     }
 
@@ -678,6 +660,3 @@
 </script>
 </body>
 </html>
-
-
-
