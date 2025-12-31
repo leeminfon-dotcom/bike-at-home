@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V35.9 (DEBUG MODE)</title>
+    <title>Horizon V36.0 (DEBUG MODE)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -108,11 +108,11 @@
 </head>
 <body>
 
-<div id="debug-console">V35.9 DEBUG Init...</div>
+<div id="debug-console">V36.0 DEBUG Init...</div>
 
 <div class="app-container">
     <div class="sidebar">
-        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35.9</div>
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V36.0</div>
         <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
 
         <div class="dash-grid">
@@ -245,6 +245,7 @@
             connectBtn: document.getElementById('connectBtn'),
             startBtn: document.getElementById('startBtn'),
             canvas: document.getElementById('workoutChart'),
+            globalTimer: document.getElementById('globalTimer'),
             totalLabel: document.getElementById('totalLabel'),
             res: document.getElementById('resVal')
         };
@@ -328,7 +329,7 @@
     // --- Traffic Control Loop (DEBUGGING) ---
     let lastWriteTime = 0;
 
-    // --- Traffic Control Loop (PATCH V35.9: Wake with 0x07) ---
+    // --- Traffic Control Loop (PATCH V36.0: Wake with 0x07) ---
     async function bleSyncLoop() {
         if(!controlChar) return;
 
@@ -675,5 +676,6 @@
 </script>
 </body>
 </html>
+
 
 
