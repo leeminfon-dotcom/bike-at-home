@@ -1,46 +1,107 @@
+
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V35.7 (Safe Debug)</title>
+    <title>Horizon V35.5 (Manual Bug Fix)</title>
     
+    <script>
+        function rawLog(msg, type='info') {
+            const el = document.getElementById('debug-console');
+            if(el) {
+                const ln = document.createElement('div');
+                const ts = new Date().toLocaleTimeString().split(' ')[0];
+                ln.textContent = `[${ts}] ${msg}`;
+                if(type==='err') ln.className = 'log-err';
+                if(type==='tx') ln.className = 'log-tx';
+                if(type==='succ') ln.className = 'log-succ';
+                el.appendChild(ln);
+                el.scrollTop = el.scrollHeight;
+            }
+        }
+        window.onerror = function(msg, url, line) {
+            rawLog(`CRASH: ${msg} (L${line})`, 'err');
+        };
+    </script>
+
     <style>
-        :root { --bg: #0f172a; --sidebar: #1e293b; --surface: #334155; --primary: #3b82f6; --text: #f8fafc; --text-muted: #94a3b8; --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; height: 100vh; display: flex; overflow: hidden; }
-        
+        :root {
+            --bg: #0f172a; --sidebar: #1e293b; --surface: #334155;
+            --primary: #3b82f6; --text: #f8fafc; --text-muted: #94a3b8;
+            --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg); color: var(--text);
+            margin: 0; padding: 0; height: 100vh; display: flex; overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Console */
         #debug-console {
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 180px;
-            background: rgba(0,0,0,0.95); color: #0f0; border-top: 2px solid #555;
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 160px;
+            background: rgba(0,0,0,0.95); color: #ccc; border-top: 2px solid #555;
             font-size: 11px; padding: 10px; overflow-y: scroll; font-family: monospace;
             z-index: 99999; box-sizing: border-box; white-space: pre-wrap;
         }
-        .log-err { color: #ff5555; } .log-tx { color: #ffff55; } .log-succ { color: #55ff55; }
+        .log-err { color: #ff5555; font-weight: bold; }
+        .log-tx { color: #ffff55; } /* Yellow for sending */
+        .log-succ { color: #55ff55; } /* Green for success */
 
+        /* Layout */
+        /* FIX: Increased padding to 250px to show Cool Down */
         .app-container { display: flex; width: 100%; height: 100%; }
-        .sidebar { width: 320px; background: var(--sidebar); padding: 20px; display: flex; flex-direction: column; border-right: 1px solid #475569; flex-shrink: 0; overflow-y: auto; padding-bottom: 250px; }
-        .content { flex: 1; padding: 20px; overflow-y: auto; position: relative; display: flex; flex-direction: column; align-items: center; padding-bottom: 250px; }
-        @media (max-width: 820px) { .app-container { flex-direction: column; } .sidebar { width: 100%; border-right: none; } }
+        
+        .sidebar {
+            width: 320px; background: var(--sidebar); padding: 20px; 
+            display: flex; flex-direction: column; border-right: 1px solid #475569;
+            flex-shrink: 0; overflow-y: auto;
+            padding-bottom: 250px; /* Fix: Space for console */
+        }
+        .content {
+            flex: 1; padding: 20px; overflow-y: auto; position: relative;
+            display: flex; flex-direction: column; align-items: center;
+            padding-bottom: 250px; /* Fix: Space for console */
+        }
 
+        @media (max-width: 820px) {
+            .app-container { flex-direction: column; }
+            .sidebar { width: 100%; border-right: none; }
+        }
+
+        /* UI */
         .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         .mini-card { background: var(--surface); padding: 10px; border-radius: 12px; text-align: center; }
         .mini-val { font-size: 24px; font-weight: 800; }
         .mini-lbl { font-size: 10px; color: var(--text-muted); }
-        .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
+        .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } 
+        .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
 
-        .main-btn { width: 100%; padding: 15px; margin-bottom: 10px; border-radius: 10px; border: none; font-weight: bold; font-size: 16px; color: white; cursor: pointer; }
-        .btn-connect { background: var(--primary); } .btn-start { background: #10b981; } .btn-stop { background: #ef4444; }
+        .main-btn {
+            width: 100%; padding: 15px; margin-bottom: 10px; border-radius: 10px; border: none; 
+            font-weight: bold; font-size: 16px; color: white; cursor: pointer;
+        }
+        .btn-connect { background: var(--primary); }
+        .btn-start { background: #10b981; }
+        .btn-stop { background: #ef4444; }
+        
         .jump-row { display: flex; gap: 10px; margin-bottom: 10px; }
         .btn-jump { flex: 1; background: #475569; color: white; border: none; padding: 12px; border-radius: 8px; }
-        
-        .chart-box { width: 100%; max-width: 600px; height: 200px; background: #1e293b; border-radius: 12px; margin-bottom: 20px; }
+
+        .chart-box {
+            width: 100%; max-width: 600px; height: 200px; 
+            background: #1e293b; border-radius: 12px; margin-bottom: 20px;
+        }
         canvas { width: 100%; height: 100%; display: block; }
+
         .global-timer { font-size: 48px; font-weight: bold; margin-bottom: 5px; }
         
         .phase-list { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px; }
         .phase-card { background: #1e293b; padding: 15px; border-radius: 12px; border: 1px solid #334155; }
         .phase-card.active { border-color: var(--primary); background: #17253d; }
         .phase-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; }
+        
         .controls-row { display: flex; gap: 10px; }
         .control-group { background: rgba(0,0,0,0.2); padding: 5px; border-radius: 8px; flex: 1; display: flex; justify-content: space-between; align-items: center; }
         .ctrl-btn { width: 30px; height: 30px; border-radius: 50%; border: none; background: #475569; color: white; }
@@ -48,18 +109,18 @@
 </head>
 <body>
 
-<div id="debug-console">V35.7 Loading...</div>
+<div id="debug-console">V35.5 Init...</div>
 
 <div class="app-container">
     <div class="sidebar">
-        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35.7</div>
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35.5</div>
         <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
 
         <div class="dash-grid">
             <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
             <div class="mini-card"><div id="pwrVal" class="mini-val c-pwr">0</div><div class="mini-lbl">WATT</div></div>
             <div class="mini-card"><div id="spdVal" class="mini-val c-spd">0.0</div><div class="mini-lbl">KMH</div></div>
-            <div class="mini-card"><div id="resVal" class="mini-val c-res">--</div><div class="mini-lbl">LEVEL</div></div>
+            <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LEVEL</div></div>
         </div>
 
         <button id="connectBtn" class="main-btn btn-connect">1. Connect</button>
@@ -75,7 +136,7 @@
     <div class="content">
         <div class="chart-box"><canvas id="workoutChart"></canvas></div>
         <div id="globalTimer" class="global-timer">00:00</div>
-        <div id="totalLabel" style="color:#666; margin-bottom:20px;">Total Plan</div>
+        <div id="totalLabel" style="color:#666; margin-bottom:20px;">Total Time</div>
 
         <div class="phase-list">
             <div id="card_warmup" class="phase-card">
@@ -93,6 +154,7 @@
                     </div>
                 </div>
             </div>
+            
             <div id="card_workout1" class="phase-card">
                 <div class="phase-header"><span>WORKOUT 1</span><span id="timer_workout1">00:00</span></div>
                 <div class="controls-row">
@@ -108,6 +170,7 @@
                     </div>
                 </div>
             </div>
+
             <div id="card_workout2" class="phase-card">
                 <div class="phase-header"><span>WORKOUT 2</span><span id="timer_workout2">00:00</span></div>
                 <div class="controls-row">
@@ -123,6 +186,7 @@
                     </div>
                 </div>
             </div>
+
             <div id="card_cooldown" class="phase-card">
                 <div class="phase-header"><span>COOL DOWN</span><span id="timer_cooldown">00:00</span></div>
                 <div class="controls-row">
@@ -143,25 +207,7 @@
 </div>
 
 <script>
-    // --- SAFE LOGGING ---
-    function rawLog(msg, type) {
-        var el = document.getElementById('debug-console');
-        if(!el) return;
-        var ln = document.createElement('div');
-        var ts = new Date().toTimeString().split(' ')[0];
-        ln.innerText = "[" + ts + "] " + msg;
-        if(type === 'err') ln.style.color = '#ff5555';
-        if(type === 'tx') ln.style.color = '#ffff55';
-        if(type === 'succ') ln.style.color = '#55ff55';
-        el.appendChild(ln);
-        el.scrollTop = el.scrollHeight;
-    }
-
-    window.onerror = function(msg, url, line) {
-        rawLog("ERROR: " + msg + " L" + line, 'err');
-    };
-
-    // --- CONFIG ---
+    // --- 1. CONFIG & STATE ---
     const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
     const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
     const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
@@ -171,11 +217,11 @@
     let currentPhase = null; 
     const phaseOrder = ['warmup', 'workout1', 'workout2', 'cooldown'];
     
-    // Traffic & State
+    // Traffic Control
     let targetResistance = 1; 
     let sentResistance = -99; 
     let isWriting = false;    
-    let lastCmdTime = 0; 
+    let lastCmdTime = 0; // [新增] 記錄最後一次發送指令的時間
     let syncInterval = null;
     let workoutInterval;
 
@@ -188,68 +234,73 @@
     let phases = JSON.parse(JSON.stringify(defaultPhases));
     let ui = {};
 
-    // --- BOOT ---
+    // --- 2. STARTUP ---
+    window.onload = function() {
+        try { initApp(); } 
+        catch(e) { rawLog(`INIT ERROR: ${e.message}`, 'err'); }
+    };
+
     function initApp() {
-        rawLog("Booting V35.7...");
         ui = {
             btStatus: document.getElementById('btStatus'),
             connectBtn: document.getElementById('connectBtn'),
             startBtn: document.getElementById('startBtn'),
             canvas: document.getElementById('workoutChart'),
-            totalLabel: document.getElementById('totalLabel'),
-            globalTimer: document.getElementById('globalTimer'),
+            totalLabel: document.getElementById('totalLabel'), // Fixed mapping
             res: document.getElementById('resVal')
         };
 
-        if(!ui.connectBtn) { rawLog("FATAL: UI Missing", 'err'); return; }
+        if(!ui.connectBtn) throw new Error("UI Load Fail");
 
+        // Event Binding
         safeBind('connectBtn', startScan);
         safeBind('startBtn', toggleWorkout);
         safeBind('stopBtn', stopWorkout);
         safeBind('resetBtn', factoryReset);
-        safeBind('prevBtn', function() { jumpPhase('prev'); });
-        safeBind('nextBtn', function() { jumpPhase('next'); });
+        safeBind('prevBtn', () => jumpPhase('prev'));
+        safeBind('nextBtn', () => jumpPhase('next'));
 
-        ['warmup', 'workout1', 'workout2', 'cooldown'].forEach(function(key) {
-            safeBind('btn_'+key+'_res_minus', function() { adjRes(key, -1); });
-            safeBind('btn_'+key+'_res_plus', function() { adjRes(key, 1); });
-            safeBind('btn_'+key+'_time_minus', function() { adjTime(key, -1); });
-            safeBind('btn_'+key+'_time_plus', function() { adjTime(key, 1); });
+        ['warmup', 'workout1', 'workout2', 'cooldown'].forEach(key => {
+            safeBind(`btn_${key}_res_minus`, () => adjRes(key, -1));
+            safeBind(`btn_${key}_res_plus`, () => adjRes(key, 1));
+            safeBind(`btn_${key}_time_minus`, () => adjTime(key, -1));
+            safeBind(`btn_${key}_time_plus`, () => adjTime(key, 1));
         });
 
         loadSettings();
         refreshUI();
         
+        // Start Sync Loop (Always running to catch manual changes)
         if(syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(bleSyncLoop, 250);
-        rawLog("Sync Loop Started");
 
-        setTimeout(function() { resizeCanvas(); drawChart(); }, 500);
-        window.addEventListener('resize', function() { resizeCanvas(); drawChart(); });
+        setTimeout(() => { resizeCanvas(); drawChart(); }, 300);
+        window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
         
         rawLog("System Ready.");
     }
 
     function safeBind(id, fn) {
-        var el = document.getElementById(id);
+        const el = document.getElementById(id);
         if(el) el.addEventListener('click', fn);
     }
 
-    // Force Boot
-    window.addEventListener('load', initApp);
-    setTimeout(function(){ if(!ui.connectBtn) initApp(); }, 1000);
-
-    // --- BLUETOOTH ---
+    // --- 3. BLUETOOTH CORE ---
     async function startScan() {
-        if(!navigator.bluetooth) return alert("WebBluetooth Not Supported");
+        if(!navigator.bluetooth) return alert("Browser not supported");
         try {
             ui.connectBtn.innerText = "Scanning...";
             const dev = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true, optionalServices: [FTMS_UUID]
+                acceptAllDevices: true, 
+                optionalServices: [FTMS_UUID]
             });
             
-            rawLog("Dev: " + dev.name);
+            rawLog(`Device: ${dev.name} (${dev.id})`);
             
+            // Store Connection Info
+            localStorage.setItem('last_device_name', dev.name);
+            localStorage.setItem('last_device_id', dev.id);
+
             dev.addEventListener('gattserverdisconnected', onDisconnect);
             const server = await dev.gatt.connect();
             const svc = await server.getPrimaryService(FTMS_UUID);
@@ -259,9 +310,12 @@
             await dataChar.startNotifications();
             dataChar.addEventListener('characteristicvaluechanged', parseData);
 
-            rawLog("Handshake...", 'tx');
+            // Handshake Sequence (Slower for reliability)
+            rawLog("Handshake: Request Control...", 'tx');
             await sendHexDirect(0x00); 
             await sleep(200); 
+            
+            rawLog("Handshake: Start/Resume...", 'tx');
             await sendHexDirect(0x07);
             await sleep(200);
 
@@ -272,20 +326,19 @@
             
         } catch(e) {
             ui.connectBtn.innerText = "Connect";
-            rawLog("Connect Fail: " + e, 'err');
+            rawLog(`Connect Fail: ${e.message}`, 'err');
         }
     }
 
-    // --- TRAFFIC CONTROL & PROTOCOL DEBUG ---
+    // Traffic Control Loop (Fixed: Re-assert Control)
     let lastWriteTime = 0;
 
     async function bleSyncLoop() {
         if(!controlChar) return;
 
-        // Anti-Deadlock
+        // 1. 防死鎖機制
         if(isWriting && (Date.now() - lastWriteTime > 1000)) {
             isWriting = false;
-            rawLog("Deadlock Broken", 'err');
         }
 
         if(isWriting) return;
@@ -295,9 +348,338 @@
             lastWriteTime = Date.now();
             
             try {
+                // UI Sync
                 if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
 
-                // --- V35.5 Protocol: Uint8 (2 Bytes) ---
-                var buf = new ArrayBuffer(2); 
-                var v = new DataView(buf);
-                v.setUint8(0,
+                // --- NEW FIX START: Re-assert Control ---
+                // 先送 0x00 (Request Control) 確保拿到控制權
+                await controlChar.writeValue(new Uint8Array([0x00]));
+                // --- NEW FIX END ---
+
+                rawLog(`TX Level: ${targetResistance}`, 'tx');
+                
+                // 恢復使用標準 FTMS (Uint16 * 10) - 因為你證明了這才是對的
+                const buf = new ArrayBuffer(3);
+                const v = new DataView(buf);
+                v.setUint8(0, 0x04); // OpCode
+                v.setUint16(1, targetResistance * 10, true); // Value * 10
+                
+                await controlChar.writeValue(buf);
+                
+                sentResistance = targetResistance;
+                lastCmdTime = Date.now();
+                // rawLog(`TX OK`, 'succ');
+                
+            } catch(e) {
+                // rawLog(`TX Fail`, 'err');
+            } finally {
+                isWriting = false;
+            }
+        }
+    }
+    
+    async function sendHexDirect(b) {
+        if(controlChar) await controlChar.writeValue(new Uint8Array([b])).catch(e=>rawLog("HexErr:"+e));
+    }
+    
+    function onDisconnect() {
+        ui.btStatus.innerText = "Disconnected";
+        ui.btStatus.style.color = "#666";
+        ui.connectBtn.style.display = 'block';
+        if(currentStatus!=='IDLE') stopWorkout();
+        rawLog("Device Disconnected", 'err');
+    }
+
+    // --- 4. WORKOUT LOGIC ---
+    function toggleWorkout() {
+        if(currentStatus==='IDLE') startWorkout();
+        else if(currentStatus==='RUNNING') pauseWorkout();
+        else resumeWorkout();
+    }
+
+    function startWorkout() {
+        saveSettings();
+        if(!controlChar) rawLog("Demo Mode (No Device)", 'err');
+        
+        sendHexDirect(0x07); // Ensure Wake
+        
+        if(!currentPhase) currentPhase = 'warmup';
+        currentStatus = 'RUNNING';
+        updateBtns();
+        
+        if(workoutInterval) clearInterval(workoutInterval);
+        workoutInterval = setInterval(timerLoop, 1000);
+        
+        activatePhase(currentPhase);
+        rawLog("Workout Started.");
+    }
+
+    function pauseWorkout() {
+        currentStatus = 'PAUSED';
+        clearInterval(workoutInterval);
+        updateBtns();
+        rawLog("Paused.");
+    }
+
+    function resumeWorkout() {
+        currentStatus = 'RUNNING';
+        updateBtns();
+        workoutInterval = setInterval(timerLoop, 1000);
+        sentResistance = -99; // Force resend on resume
+        rawLog("Resumed.");
+    }
+
+    function stopWorkout() {
+        currentStatus = 'IDLE';
+        currentPhase = null;
+        clearInterval(workoutInterval);
+        updateBtns();
+        document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
+        resetTimers(); refreshUI();
+        
+        // Reset Bike
+        targetResistance = 1; 
+        
+        saveSettings(); drawChart();
+        rawLog("Stopped.");
+    }
+
+    function jumpPhase(dir) {
+        let idx = phaseOrder.indexOf(currentPhase||'warmup');
+        if(dir==='next') idx++; else idx--;
+        if(idx<0 || idx>=phaseOrder.length) return rawLog("Limit Reached");
+        
+        const k = phaseOrder[idx];
+        phases[k].remainingSecs = phases[k].mins*60;
+        activatePhase(k);
+        refreshUI(); drawChart();
+        rawLog(`Jump > ${k}`);
+    }
+
+    function activatePhase(k) {
+        currentPhase = k;
+        document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
+        const c = document.getElementById(`card_${k}`);
+        if(c) c.classList.add('active');
+        
+        // 1. 強制重送 (Force Loop to send)
+        sentResistance = -99; 
+        targetResistance = phases[k].res;
+        
+        // 2. 強制更新儀表板 (Force UI update)
+        if(ui.res) ui.res.innerText = targetResistance;
+        
+        rawLog(`Phase ${k}. Target: ${targetResistance}`);
+    }
+
+    function timerLoop() {
+        if(!currentPhase) return;
+        if(phases[currentPhase].remainingSecs > 0) phases[currentPhase].remainingSecs--;
+        else {
+            let idx = phaseOrder.indexOf(currentPhase);
+            if(idx < phaseOrder.length - 1) activatePhase(phaseOrder[idx+1]);
+            else { stopWorkout(); alert("Workout Finished!"); }
+        }
+        refreshUI(); drawChart();
+    }
+
+    // --- 5. DATA & UI ---
+    function adjTime(p, d) {
+        if(phases[p].mins+d < 1) return;
+        phases[p].mins += d;
+        if(currentStatus==='IDLE' || currentPhase!==p) phases[p].remainingSecs = phases[p].mins*60;
+        else {
+            phases[p].remainingSecs += (d*60);
+            if(phases[p].remainingSecs < 0) phases[p].remainingSecs = 0;
+        }
+        refreshUI(); drawChart();
+    }
+
+    function adjRes(p, d) {
+        phases[p].res += d;
+        if(phases[p].res<1) phases[p].res=1;
+        if(phases[p].res>32) phases[p].res=32;
+        
+        // Only update target immediately if this is the active phase
+        if(currentPhase===p) {
+            targetResistance = phases[p].res;
+            rawLog(`User Adj: Target ${targetResistance}`);
+        }
+        refreshUI(); drawChart();
+    }
+
+    function parseData(e) {
+        const v = e.target.value;
+        const f = v.getUint16(0, true);
+        let off = 2;
+
+        // 1. Speed (Bit 0)
+        if(!(f&1)) { 
+            document.getElementById('spdVal').innerText = (v.getUint16(off,true)*0.01).toFixed(1); 
+            off+=2; 
+        }
+        // 2. Average Speed (Bit 1) - Skip
+        if(f&2) off+=2;
+        
+        // 3. Cadence/RPM (Bit 2)
+        if(f&4) { 
+            document.getElementById('rpmVal').innerText = Math.floor(v.getUint16(off,true)*0.5); 
+            off+=2; 
+        }
+        // 4. Average Cadence (Bit 3) - Skip
+        if(f&8) off+=2;
+        // 5. Total Distance (Bit 4) - Skip (3 bytes)
+        if(f&16) off+=3;
+        
+        // 6. Resistance Level (Bit 5) --- [關鍵修改] ---
+        if(f&32) {
+            const realLevel = v.getInt16(off, true);
+            
+            // 只有當「距離上次發送指令超過 3 秒」才更新儀表板
+            // 這樣可以避免調整時數字亂跳，但平穩時又能顯示真實數據
+            if (Date.now() - lastCmdTime > 3000) {
+                if(ui.res) ui.res.innerText = realLevel;
+                // 如果需要，也可以在這裡反向更新 targetResistance，保持同步
+                // targetResistance = realLevel; 
+            }
+            off+=2;
+        }
+        
+        // 7. Instantaneous Power (Bit 6)
+        if(f&64) {
+            document.getElementById('pwrVal').innerText = v.getInt16(off,true);
+            // off+=2;
+        }
+    }
+
+    function refreshUI() {
+        let totalPlanMins = 0;
+        let totalRemainingSecs = 0;
+
+        for(let k in phases) {
+            // 更新個別卡片
+            document.getElementById(`val_res_${k}`).innerText = phases[k].res;
+            document.getElementById(`val_time_${k}`).innerText = phases[k].mins;
+            document.getElementById(`timer_${k}`).innerText = fmt(phases[k].remainingSecs);
+            
+            // 累加總數
+            totalPlanMins += phases[k].mins;
+            totalRemainingSecs += phases[k].remainingSecs;
+        }
+        
+        // 1. 大數字顯示：總剩餘秒數 (倒數)
+        if(ui.globalTimer) ui.globalTimer.innerText = fmt(totalRemainingSecs);
+        
+        // 2. 小標題顯示：總計畫分鐘數 (固定)
+        if(ui.totalLabel) ui.totalLabel.innerText = "Plan: " + totalPlanMins + " Mins";
+
+        // 3. 確保儀表板 Level 與目標一致 (如果正在運動中)
+        if(currentStatus !== 'IDLE' && ui.res) {
+            ui.res.innerText = targetResistance;
+        }
+    }
+    
+    function fmt(s) {
+        let m=Math.floor(s/60), sec=s%60;
+        return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
+    }
+
+    function updateBtns() {
+        if(currentStatus==='IDLE') { ui.startBtn.innerText="START"; ui.startBtn.style.background="#10b981"; }
+        else if(currentStatus==='RUNNING') { ui.startBtn.innerText="PAUSE"; ui.startBtn.style.background="#f59e0b"; }
+        else { ui.startBtn.innerText="RESUME"; ui.startBtn.style.background="#10b981"; }
+    }
+
+    // --- 6. UTILS ---
+    function loadSettings() {
+        try {
+            const saved = localStorage.getItem('horizon_v33');
+            if(saved) {
+                const p = JSON.parse(saved);
+                for(let k in phases) { if(p[k]) { phases[k].mins=p[k].mins; phases[k].res=p[k].res; }}
+                rawLog("Settings Restored.");
+            }
+        } catch(e) {}
+        resetTimers();
+    }
+
+    function saveSettings() {
+        try {
+            const toSave = {};
+            for(let k in phases) toSave[k] = { mins:phases[k].mins, res:phases[k].res };
+            localStorage.setItem('horizon_v33', JSON.stringify(toSave));
+        } catch(e) {}
+    }
+
+    function factoryReset() {
+        if(!confirm("Reset?")) return;
+        localStorage.removeItem('horizon_v33');
+        phases = JSON.parse(JSON.stringify(defaultPhases));
+        resetTimers(); refreshUI(); drawChart();
+        rawLog("Reset Done.");
+    }
+
+    function resetTimers() {
+        for(let k in phases) phases[k].remainingSecs = phases[k].mins * 60;
+        refreshUI();
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    function resizeCanvas() {
+        const b = ui.canvas.parentElement;
+        const d = window.devicePixelRatio||1;
+        ui.canvas.width = b.clientWidth*d;
+        ui.canvas.height = b.clientHeight*d;
+        ui.canvas.getContext('2d').scale(d,d);
+    }
+
+    function drawChart() {
+        const ctx = ui.canvas.getContext('2d');
+        const W = ui.canvas.width / (window.devicePixelRatio||1);
+        const H = ui.canvas.height / (window.devicePixelRatio||1);
+        ctx.clearRect(0,0,W,H);
+        
+        let tm = 0; phaseOrder.forEach(k=>tm+=phases[k].mins);
+        if(tm===0) tm=1;
+
+        const padL=30, padB=20;
+        const gw=W-padL, gh=H-padB;
+        const pxM = gw/tm;
+        const pxL = gh/35;
+
+        // Grid
+        ctx.strokeStyle="#334155"; ctx.fillStyle="#94a3b8"; ctx.font="10px monospace";
+        ctx.textAlign="right"; ctx.textBaseline="middle";
+        for(let l=0; l<=35; l+=5) {
+            let y = gh - (l*pxL);
+            ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W,y); ctx.stroke();
+            ctx.fillText(l, padL-5, y);
+        }
+
+        ctx.textAlign="center"; ctx.textBaseline="top";
+        let step = tm<=15?2:5;
+        for(let t=0; t<=tm; t+=step) {
+            let x = padL + (t*pxM);
+            ctx.fillText(t, x, gh+4);
+        }
+
+        let cx = 0;
+        phaseOrder.forEach(k=>{
+            const w = phases[k].mins*pxM;
+            const h = phases[k].res*pxL;
+            ctx.fillStyle="#475569"; ctx.fillRect(padL+cx, gh-h, w, h);
+            
+            const dur = phases[k].mins*60;
+            const elap = dur - phases[k].remainingSecs;
+            if(elap>0) {
+                ctx.fillStyle="rgba(59,130,246,0.7)";
+                ctx.fillRect(padL+cx, gh-h, (elap/dur)*w, h);
+            }
+            cx+=w;
+        });
+    }
+</script>
+</body>
+</html>
+
