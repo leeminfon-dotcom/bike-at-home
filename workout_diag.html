@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V37 (Device Memory)</title>
+    <title>Horizon V38 (Light Mode)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -25,10 +25,20 @@
     </script>
 
     <style>
+        /* --- CHANGED TO LIGHT THEME --- */
         :root {
-            --bg: #0f172a; --sidebar: #1e293b; --surface: #334155;
-            --primary: #3b82f6; --text: #f8fafc; --text-muted: #94a3b8;
-            --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899;
+            --bg: #ffffff;           /* White Background */
+            --sidebar: #f1f5f9;      /* Light Gray Sidebar */
+            --surface: #e2e8f0;      /* Darker Gray Cards */
+            --primary: #2563eb;      /* Darker Blue for visibility */
+            --text: #0f172a;         /* Dark Black Text */
+            --text-muted: #475569;   /* Muted Text */
+            
+            /* Metric Colors (Darker for white bg) */
+            --c-rpm: #059669; 
+            --c-pwr: #d97706; 
+            --c-spd: #0891b2; 
+            --c-res: #db2777;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -37,11 +47,11 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Console */
+        /* Console (Keep dark for contrast) */
         #debug-console {
             position: fixed; bottom: 0; left: 0; width: 100%; height: 160px;
-            background: rgba(0,0,0,0.95); color: #ccc; border-top: 2px solid #555;
-            font-size: 11px; padding: 10px; overflow-y: scroll; font-family: monospace;
+            background: #000; color: #0f0; border-top: 2px solid #555; /* Matrix Green */
+            font-size: 12px; padding: 10px; overflow-y: scroll; font-family: monospace;
             z-index: 99999; box-sizing: border-box; white-space: pre-wrap;
         }
         .log-err { color: #ff5555; font-weight: bold; }
@@ -53,7 +63,7 @@
         
         .sidebar {
             width: 320px; background: var(--sidebar); padding: 20px; 
-            display: flex; flex-direction: column; border-right: 1px solid #475569;
+            display: flex; flex-direction: column; border-right: 1px solid #cbd5e1;
             flex-shrink: 0; overflow-y: auto;
             padding-bottom: 180px; 
         }
@@ -72,9 +82,9 @@
 
         /* UI */
         .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .mini-card { background: var(--surface); padding: 10px; border-radius: 12px; text-align: center; }
+        .mini-card { background: var(--surface); padding: 10px; border-radius: 12px; text-align: center; border: 1px solid #cbd5e1; }
         .mini-val { font-size: 24px; font-weight: 800; }
-        .mini-lbl { font-size: 10px; color: var(--text-muted); }
+        .mini-lbl { font-size: 10px; color: var(--text-muted); font-weight: bold; }
         .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } 
         .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
 
@@ -83,11 +93,26 @@
             font-weight: bold; font-size: 16px; color: white; cursor: pointer;
         }
         .btn-connect { background: var(--primary); }
-        .btn-start { background: #10b981; }
-        .btn-stop { background: #ef4444; }
+        .btn-start { background: #059669; }
+        .btn-stop { background: #dc2626; }
         
         .jump-row { display: flex; gap: 10px; margin-bottom: 10px; }
-        .btn-jump { flex: 1; background: #475569; color: white; border: none; padding: 12px; border-radius: 8px; }
+        .btn-jump { flex: 1; background: #cbd5e1; color: #333; border: none; padding: 12px; border-radius: 8px; font-weight:bold; }
 
         .chart-box {
-            width: 100%; max-width: 60
+            width: 100%; max-width: 600px; height: 200px; 
+            background: #ffffff; border: 2px solid #cbd5e1; border-radius: 12px; margin-bottom: 20px;
+            flex-shrink: 0; 
+        }
+        canvas { width: 100%; height: 100%; display: block; }
+
+        .global-timer { font-size: 48px; font-weight: bold; margin-bottom: 5px; color: #000; }
+        
+        .phase-list { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px; }
+        .phase-card { background: #ffffff; padding: 15px; border-radius: 12px; border: 1px solid #cbd5e1; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .phase-card.active { border-color: var(--primary); background: #eff6ff; border-width: 2px; }
+        .phase-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; }
+        
+        .controls-row { display: flex; gap: 10px; }
+        .control-group { background: #f1f5f9; padding: 5px; border-radius: 8px; flex: 1; display: flex; justify-content: space-between; align-items: center; border: 1px solid #e2e8f0; }
+        .ctrl-btn { width: 30px
