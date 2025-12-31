@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V35.6 (Manual Bug Fix)</title>
+    <title>Horizon V35.7 (Manual Bug Fix)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -108,11 +109,11 @@
 </head>
 <body>
 
-<div id="debug-console">V35.6 Init...</div>
+<div id="debug-console">V35.7 Init...</div>
 
 <div class="app-container">
     <div class="sidebar">
-        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35.6</div>
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V35.7</div>
         <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
 
         <div class="dash-grid">
@@ -246,8 +247,7 @@
             startBtn: document.getElementById('startBtn'),
             canvas: document.getElementById('workoutChart'),
             totalLabel: document.getElementById('totalLabel'), // Fixed mapping
-            res: document.getElementById('resVal'),
-            globalTimer: document.getElementById('globalTimer')
+            res: document.getElementById('resVal')
         };
 
         if(!ui.connectBtn) throw new Error("UI Load Fail");
@@ -310,9 +310,6 @@
             await dataChar.startNotifications();
             dataChar.addEventListener('characteristicvaluechanged', parseData);
 
-            // show characteristic properties for debug
-            try { rawLog(`Control Char props: ${JSON.stringify(controlChar.properties)}`); } catch(e){}
-
             // Handshake Sequence (Slower for reliability)
             rawLog("Handshake: Request Control...", 'tx');
             await sendHexDirect(0x00); 
@@ -329,7 +326,7 @@
             
         } catch(e) {
             ui.connectBtn.innerText = "Connect";
-            rawLog(`Connect Fail: ${e.message || e}`, 'err');
+            rawLog(`Connect Fail: ${e.message}`, 'err');
         }
     }
 
@@ -354,25 +351,31 @@
                 // UI Sync
                 if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
 
-                // --- NEW FIX START: Re-assert Control with short gap ---
+                // --- NEW FIX START: Re-assert Control ---
+                // 先送 0x00 (Request Control) 確保拿到控制權
                 await controlChar.writeValue(new Uint8Array([0x00]));
-                await sleep(60); // small pause to let device process control request
+                
+                // [關鍵修正] 給設備一點時間處理 Request Control，避免指令連發導致阻塞
+                await sleep(150); 
                 // --- NEW FIX END ---
 
                 rawLog(`TX Level: ${targetResistance}`, 'tx');
                 
-                // 使用 Uint8Array 傳送 (更兼容)
-                const val = targetResistance * 10;
-                const bytes = new Uint8Array([0x04, val & 0xff, (val >> 8) & 0xff]);
+                // 恢復使用標準 FTMS (Uint16 * 10)
+                const buf = new ArrayBuffer(3);
+                const v = new DataView(buf);
+                v.setUint8(0, 0x04); // OpCode
+                v.setUint16(1, targetResistance * 10, true); // Value * 10
                 
-                await controlChar.writeValue(bytes);
+                await controlChar.writeValue(buf);
                 
                 sentResistance = targetResistance;
                 lastCmdTime = Date.now();
-                rawLog(`TX OK: ${bytesToHex(bytes)}`, 'succ');
                 
             } catch(e) {
-                rawLog(`TX Fail: ${e.message || e}`, 'err');
+                // 如果發送失敗，將 sentResistance 重置，確保下次迴圈會重試
+                sentResistance = -99; 
+                rawLog(`TX Fail: ${e.message}`, 'err');
             } finally {
                 isWriting = false;
             }
@@ -380,7 +383,7 @@
     }
     
     async function sendHexDirect(b) {
-        if(controlChar) await controlChar.writeValue(new Uint8Array([b])).catch(e=>rawLog("HexErr:"+ (e.message||e), 'err'));
+        if(controlChar) await controlChar.writeValue(new Uint8Array([b])).catch(e=>rawLog("HexErr:"+e));
     }
     
     function onDisconnect() {
@@ -504,8 +507,6 @@
         // Only update target immediately if this is the active phase
         if(currentPhase===p) {
             targetResistance = phases[p].res;
-            // 強制讓下一次同步發送（若要立即送出)
-            // sentResistance = -99; // 不必要，但若你想立即強制送，可打開這行
             rawLog(`User Adj: Target ${targetResistance}`);
         }
         refreshUI(); drawChart();
@@ -682,11 +683,7 @@
             cx+=w;
         });
     }
-
-    // --- Helper for logging bytes ---
-    function bytesToHex(arr) {
-        return Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join(' ');
-    }
 </script>
 </body>
 </html>
+
