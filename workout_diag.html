@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V36.0 (DEBUG MODE)</title>
+    <title>Horizon V36.1 (DEBUG MODE)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -108,11 +108,11 @@
 </head>
 <body>
 
-<div id="debug-console">V36.0 DEBUG Init...</div>
+<div id="debug-console">V36.1 DEBUG Init...</div>
 
 <div class="app-container">
     <div class="sidebar">
-        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V36.0</div>
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V36.1</div>
         <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
 
         <div class="dash-grid">
@@ -286,97 +286,79 @@
     // --- 3. BLUETOOTH CORE ---
     async function startScan() {
         if(!navigator.bluetooth) return alert("Browser not supported");
+        
+        // 變更按鈕文字，讓使用者知道正在嘗試
+        const originalText = ui.connectBtn.innerText;
+        ui.connectBtn.innerText = "Connecting...";
+        
         try {
-            ui.connectBtn.innerText = "Scanning...";
+            // [嘗試自動連線]
+            // 只有當瀏覽器支援 getDevices 時才執行，WebBLE 會自動跳過這段
+            if (typeof navigator.bluetooth.getDevices === 'function') {
+                const savedId = localStorage.getItem('last_device_id');
+                if(savedId) {
+                    rawLog("Checking saved devices...");
+                    const devices = await navigator.bluetooth.getDevices();
+                    const match = devices.find(d => d.id === savedId);
+                    if (match) {
+                        rawLog(`Found saved device: ${match.name}. Reconnecting...`);
+                        await bleConnect(match);
+                        return; // 自動連線成功，結束函數
+                    }
+                }
+            }
+        
+            // [標準掃描] 如果沒有支援自動連線，或找不到舊設備
+            rawLog("Scanning for new device...");
             const dev = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true, 
                 optionalServices: [FTMS_UUID]
             });
-            
-            rawLog(`Device: ${dev.name} (${dev.id})`);
-            
-            localStorage.setItem('last_device_name', dev.name);
-            localStorage.setItem('last_device_id', dev.id);
-
-            dev.addEventListener('gattserverdisconnected', onDisconnect);
-            const server = await dev.gatt.connect();
-            const svc = await server.getPrimaryService(FTMS_UUID);
-            controlChar = await svc.getCharacteristic(CTRL_UUID);
-            const dataChar = await svc.getCharacteristic(DATA_UUID);
-            
-            await dataChar.startNotifications();
-            dataChar.addEventListener('characteristicvaluechanged', parseData);
-
-            rawLog("Handshake: Request Control (0x00)...", 'tx');
-            await sendHexDirect(0x00); 
-            await sleep(200); 
-            
-            rawLog("Handshake: Start (0x07)...", 'tx');
-            await sendHexDirect(0x07);
-            await sleep(200);
-
-            ui.btStatus.innerText = "Connected: " + dev.name;
-            ui.btStatus.style.color = "#3b82f6";
-            ui.connectBtn.style.display = 'none';
-            rawLog("Connected!", 'succ');
+            await bleConnect(dev);
             
         } catch(e) {
-            ui.connectBtn.innerText = "Connect";
-            rawLog(`Connect Fail: ${e.message}`, 'err');
+            ui.connectBtn.innerText = originalText; // 恢復按鈕文字
+            // 忽略 "User cancelled" 的錯誤，不顯示紅字
+            if(!e.message.includes("cancelled")) {
+                rawLog(`Connect Fail: ${e.message}`, 'err');
+            }
         }
     }
 
     // --- Traffic Control Loop (DEBUGGING) ---
     let lastWriteTime = 0;
 
-    // --- Traffic Control Loop (PATCH V36.0: Wake with 0x07) ---
-    async function bleSyncLoop() {
-        if(!controlChar) return;
+    // --- Traffic Control Loop (PATCH V36.1: Wake with 0x07) ---
+    async function bleConnect(dev) {
+        // 儲存設備資訊
+        localStorage.setItem('last_device_name', dev.name);
+        localStorage.setItem('last_device_id', dev.id);
 
-        // 1. Watchdog
-        if(isWriting && (Date.now() - lastWriteTime > 1000)) {
-            rawLog("Watchdog: Resetting isWriting lock", 'err');
-            isWriting = false;
-        }
-
-        if(isWriting) return;
+        dev.addEventListener('gattserverdisconnected', onDisconnect);
         
-        if(targetResistance !== sentResistance) {
-            
-            isWriting = true;
-            lastWriteTime = Date.now();
-            
-            try {
-                if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
+        rawLog(`Connecting to GATT: ${dev.name}...`);
+        const server = await dev.gatt.connect();
+        
+        const svc = await server.getPrimaryService(FTMS_UUID);
+        controlChar = await svc.getCharacteristic(CTRL_UUID);
+        const dataChar = await svc.getCharacteristic(DATA_UUID);
+        
+        await dataChar.startNotifications();
+        dataChar.addEventListener('characteristicvaluechanged', parseData);
 
-                // [修正點] 發送阻力前，先送一次 0x07 (Start/Resume) 喚醒設備
-                rawLog(`[TX] Waking (0x07) & Setting Res to ${targetResistance}...`, 'tx');
-                
-                // 1. Send Start/Resume
-                await controlChar.writeValue(new Uint8Array([0x07]));
-                
-                // 給一點點緩衝讓它處理 0x07
-                await sleep(50); 
+        // Handshake Sequence (Ensure Wake)
+        rawLog("Handshake: Request Control (0x00)...", 'tx');
+        await sendHexDirect(0x00); 
+        await sleep(200); 
+        
+        rawLog("Handshake: Start (0x07)...", 'tx');
+        await sendHexDirect(0x07);
+        await sleep(200);
 
-                // 2. Send Resistance (0x04)
-                const buf = new ArrayBuffer(3);
-                const v = new DataView(buf);
-                v.setUint8(0, 0x04); // OpCode
-                v.setUint16(1, targetResistance * 10, true); // Value
-                
-                await controlChar.writeValue(buf);
-                
-                rawLog(`[TX] 0x04 Written (Res: ${targetResistance})`, 'succ');
-                sentResistance = targetResistance;
-                lastCmdTime = Date.now();
-                
-            } catch(e) {
-                sentResistance = -99; 
-                rawLog(`TX ERROR: ${e.message}`, 'err');
-            } finally {
-                isWriting = false;
-            }
-        }
+        ui.btStatus.innerText = "Connected: " + dev.name;
+        ui.btStatus.style.color = "#3b82f6";
+        ui.connectBtn.style.display = 'none';
+        rawLog("Connected!", 'succ');
     }
     
     async function sendHexDirect(b) {
@@ -676,6 +658,7 @@
 </script>
 </body>
 </html>
+
 
 
 
