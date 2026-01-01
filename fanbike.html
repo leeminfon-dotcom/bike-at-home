@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fanbike V0.1</title>
+    <title>Fanbike V0.2</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -51,24 +51,50 @@
 
         /* Layout */
         /* FIX: Increased padding to 250px to show Cool Down */
-        .app-container { display: flex; width: 100%; height: 100%; }
-        
-        .sidebar {
-            width: 320px; background: var(--sidebar); padding: 20px; 
-            display: flex; flex-direction: column; border-right: 1px solid #475569;
-            flex-shrink: 0; overflow-y: auto;
-            padding-bottom: 250px; /* Fix: Space for console */
-        }
-        .content {
-            flex: 1; padding: 20px; overflow-y: auto; position: relative;
-            display: flex; flex-direction: column; align-items: center;
-            padding-bottom: 250px; /* Fix: Space for console */
-        }
+       /* 修改 Layout 區塊 */
+		
+.app-container { 
+    display: flex; 
+    flex-direction: column; /* 改為垂直排列 */
+    width: 100%; 
+    height: 100%; 
+    background: var(--bg);
+}
 
-        @media (max-width: 820px) {
-            .app-container { flex-direction: column; }
-            .sidebar { width: 100%; border-right: none; }
-        }
+/* 移除 .sidebar 樣式，修改 .content 填滿 */
+.content {
+    width: 100%;
+    max-width: 600px; /* 限制最大寬度，在大螢幕比較好看 */
+    margin: 0 auto;   /* 置中 */
+    padding: 20px;
+    display: flex; 
+    flex-direction: column; 
+    align-items: center;
+    box-sizing: border-box;
+}
+
+/* 調整按鈕列，讓它們橫向排列 */
+.btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr; /* 三個按鈕均分 */
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+/* 調整儀表板 Grid */
+.dash-grid { 
+    display: grid; 
+    grid-template-columns: 1fr 1fr 1fr 1fr; /* 四個數據並排 */
+    gap: 10px; 
+    width: 100%;
+    margin-bottom: 20px; 
+}
+
+/* 手機版適配：數據變兩排 */
+@media (max-width: 480px) {
+    .dash-grid { grid-template-columns: 1fr 1fr; }
+}
 
         /* UI */
         .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
@@ -109,38 +135,42 @@
 </head>
 <body>
 
-<div id="debug-console">V1.0 Init...</div>
+<div id="debug-console">V0.1 Init...</div>
 
 <div class="app-container">
-    <div class="sidebar">
-    <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V1.1</div>
-    <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
+    <div class="content">
+        <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <div style="font-weight:bold; font-size:20px;">Fanbike V0.2</div>
+            <div id="btStatus" style="color:#666; font-size:14px;">Disconnected</div>
+        </div>
 
-    <div class="dash-grid">
-        <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
-        <div class="mini-card"><div id="pwrVal" class="mini-val c-pwr">0</div><div class="mini-lbl">WATT</div></div>
-        <div class="mini-card"><div id="spdVal" class="mini-val c-spd">0.0</div><div class="mini-lbl">KMH</div></div>
-        <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LEVEL</div></div>
-    </div>
+        <div class="btn-row">
+            <button id="connectBtn" class="main-btn btn-connect" style="margin:0;">Connect</button>
+            <button id="startBtn" class="main-btn btn-start" style="margin:0;">START</button>
+            <button id="stopBtn" class="main-btn btn-stop" style="margin:0;">STOP</button>
+        </div>
 
-    <button id="connectBtn" class="main-btn btn-connect">1. Connect</button>
-    <button id="startBtn" class="main-btn btn-start">START</button>
-    <button id="stopBtn" class="main-btn btn-stop">STOP</button>
-    </div>
+        <div class="dash-grid">
+            <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
+            <div class="mini-card"><div id="pwrVal" class="mini-val c-pwr">0</div><div class="mini-lbl">WATT</div></div>
+            <div class="mini-card"><div id="spdVal" class="mini-val c-spd">0.0</div><div class="mini-lbl">KMH</div></div>
+            <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LEVEL</div></div>
+        </div>
 
-<div class="content">
-    <div id="globalTimer" class="global-timer" style="font-size: 80px; margin-top: 50px;">00:00</div>
-    <div style="color:#666; margin-bottom:40px;">Elapsed Time</div>
+        <hr style="width:100%; border:0; border-top:1px solid #334155; margin: 20px 0;">
 
-    <div style="background: var(--surface); padding: 30px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center;">
-        <div style="color: var(--text-muted); margin-bottom: 15px;">MANUAL RESISTANCE</div>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <button id="mainResMinus" class="ctrl-btn" style="width: 60px; height: 60px; font-size: 24px;">-</button>
-            <span id="mainResVal" style="font-size: 60px; font-weight: 800; color: var(--c-res);">1</span>
-            <button id="mainResPlus" class="ctrl-btn" style="width: 60px; height: 60px; font-size: 24px;">+</button>
+        <div id="globalTimer" class="global-timer" style="font-size: 80px;">00:00</div>
+        <div style="color:#666; margin-bottom:40px;">Elapsed Time</div>
+
+        <div style="background: var(--surface); padding: 30px; border-radius: 20px; width: 100%; text-align: center;">
+            <div style="color: var(--text-muted); margin-bottom: 15px;">MANUAL RESISTANCE</div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <button id="mainResMinus" class="ctrl-btn" style="width: 60px; height: 60px; font-size: 24px;">-</button>
+                <span id="mainResVal" style="font-size: 60px; font-weight: 800; color: var(--c-res);">1</span>
+                <button id="mainResPlus" class="ctrl-btn" style="width: 60px; height: 60px; font-size: 24px;">+</button>
+            </div>
         </div>
     </div>
-</div>
 </div>
 
 <script>
@@ -372,7 +402,7 @@
     }
 
     // --- 5. DATA & UI ---
-	
+    
     // 新增：手動調整阻力
     function manualAdjRes(delta) {
         targetResistance += delta;
@@ -383,30 +413,27 @@
         rawLog(`User Adj: ${targetResistance}`);
     }
 
-    // 簡化：只更新阻力顯示
+    // 修正：完全移除 phases 依賴，只更新阻力
     function refreshUI() {
         if(ui.res) ui.res.innerText = targetResistance;
         if(ui.mainRes) ui.mainRes.innerText = targetResistance;
     }
 
-    // 格式化時間 (保持不變)
+    // 格式化時間
     function fmt(s) {
         let m=Math.floor(s/60), sec=s%60;
         return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
     }
-	
-
+    
+    // 修正：刪除原本下面那個重複且錯誤的 timerLoop
+    // 只保留這個簡單版本
     function timerLoop() {
-        if(!currentPhase) return;
-        if(phases[currentPhase].remainingSecs > 0) phases[currentPhase].remainingSecs--;
-        else {
-            let idx = phaseOrder.indexOf(currentPhase);
-            if(idx < phaseOrder.length - 1) activatePhase(phaseOrder[idx+1]);
-            else { stopWorkout(); alert("Workout Finished!"); }
-        }
-        refreshUI(); drawChart();
+        workoutSeconds++;
+        ui.globalTimer.innerText = fmt(workoutSeconds);
     }
-
+    
+    // 修正：刪除原本下面那個重複的 parseData (雖然沒錯，但不需要兩個)
+    // 這裡只需要保留一個 parseData 即可 (原版上面的那個是對的)
     function parseData(e) {
         const v = e.target.value;
         const f = v.getUint16(0, true);
@@ -500,3 +527,4 @@
 </body>
 
 </html>
+
