@@ -8,17 +8,7 @@
     
     <script>
         function rawLog(msg, type='info') {
-            const el = document.getElementById('debug-console');
-            if(el) {
-                const ln = document.createElement('div');
-                const ts = new Date().toLocaleTimeString().split(' ')[0];
-                ln.textContent = `[${ts}] ${msg}`;
-                if(type==='err') ln.className = 'log-err';
-                if(type==='tx') ln.className = 'log-tx';
-                if(type==='succ') ln.className = 'log-succ';
-                el.appendChild(ln);
-                el.scrollTop = el.scrollHeight;
-            }
+            console.log(`[${type.toUpperCase()}] ${msg}`);
         }
         window.onerror = function(msg, url, line) {
             rawLog(`CRASH: ${msg} (L${line})`, 'err');
@@ -39,6 +29,8 @@
         }
 
         /* Console */
+
+        /*
         #debug-console {
             position: fixed; bottom: 0; left: 0; width: 100%; height: 160px;
             background: rgba(0,0,0,0.95); color: #ccc; border-top: 2px solid #555;
@@ -48,7 +40,8 @@
         .log-err { color: #ff5555; font-weight: bold; }
         .log-tx { color: #ffff55; } /* Yellow for sending */
         .log-succ { color: #55ff55; } /* Green for success */
-
+        */
+        
         /* Layout */
         /* FIX: Increased padding to 250px to show Cool Down */
         .app-container { display: flex; width: 100%; height: 100%; }
@@ -109,7 +102,7 @@
 </head>
 <body>
 
-<div id="debug-console">V1.0 Init...</div>
+/* <div id="debug-console">V1.0 Init...</div> */
 
 <div class="app-container">
     <div class="sidebar">
@@ -687,3 +680,4 @@
 </script>
 </body>
 </html>
+
