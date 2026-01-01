@@ -3,19 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horizon V36.1 (DEBUG MODE)</title>
+    <title>Horizon V36.2 (Stable)</title>
     
     <script>
         function rawLog(msg, type='info') {
             const el = document.getElementById('debug-console');
             if(el) {
                 const ln = document.createElement('div');
-                const ts = new Date().toLocaleTimeString().split(' ')[0] + "." + new Date().getMilliseconds();
+                const now = new Date();
+                const ts = now.toLocaleTimeString().split(' ')[0] + "." + String(now.getMilliseconds()).padStart(3, '0');
                 ln.textContent = `[${ts}] ${msg}`;
                 if(type==='err') ln.className = 'log-err';
                 if(type==='tx') ln.className = 'log-tx';
                 if(type==='succ') ln.className = 'log-succ';
-                if(type==='dbg') ln.style.color = '#aaa'; // Grey for debug
+                if(type==='dbg') ln.style.color = '#777'; 
                 el.appendChild(ln);
                 el.scrollTop = el.scrollHeight;
             }
@@ -40,14 +41,14 @@
 
         /* Console */
         #debug-console {
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 200px; /* Taller for debug */
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 180px;
             background: rgba(0,0,0,0.95); color: #ccc; border-top: 2px solid #555;
             font-size: 11px; padding: 10px; overflow-y: scroll; font-family: monospace;
             z-index: 99999; box-sizing: border-box; white-space: pre-wrap;
         }
         .log-err { color: #ff5555; font-weight: bold; }
-        .log-tx { color: #ffff55; } /* Yellow for sending */
-        .log-succ { color: #55ff55; } /* Green for success */
+        .log-tx { color: #ffff55; } 
+        .log-succ { color: #55ff55; } 
 
         /* Layout */
         .app-container { display: flex; width: 100%; height: 100%; }
@@ -108,11 +109,11 @@
 </head>
 <body>
 
-<div id="debug-console">V36.1 DEBUG Init...</div>
+<div id="debug-console">V36.2 Final Init...</div>
 
 <div class="app-container">
     <div class="sidebar">
-        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V36.1</div>
+        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V36.2</div>
         <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
 
         <div class="dash-grid">
@@ -245,7 +246,7 @@
             connectBtn: document.getElementById('connectBtn'),
             startBtn: document.getElementById('startBtn'),
             canvas: document.getElementById('workoutChart'),
-            globalTimer: document.getElementById('globalTimer'),
+            globalTimer: document.getElementById('globalTimer'), 
             totalLabel: document.getElementById('totalLabel'),
             res: document.getElementById('resVal')
         };
@@ -270,12 +271,18 @@
         refreshUI();
         
         if(syncInterval) clearInterval(syncInterval);
-        syncInterval = setInterval(bleSyncLoop, 250);
+        
+        // Ensure function exists before scheduling
+        if(typeof bleSyncLoop === 'function') {
+            syncInterval = setInterval(bleSyncLoop, 250);
+        } else {
+            rawLog("FATAL: bleSyncLoop not defined", 'err');
+        }
 
         setTimeout(() => { resizeCanvas(); drawChart(); }, 300);
         window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
         
-        rawLog("System Ready (Debug Enabled).");
+        rawLog("System Ready (V36.2 Stable).");
     }
 
     function safeBind(id, fn) {
@@ -283,17 +290,15 @@
         if(el) el.addEventListener('click', fn);
     }
 
-    // --- 3. BLUETOOTH CORE ---
+    // --- 3. BLUETOOTH CORE (Auto-Connect) ---
     async function startScan() {
         if(!navigator.bluetooth) return alert("Browser not supported");
         
-        // 變更按鈕文字，讓使用者知道正在嘗試
         const originalText = ui.connectBtn.innerText;
         ui.connectBtn.innerText = "Connecting...";
         
         try {
-            // [嘗試自動連線]
-            // 只有當瀏覽器支援 getDevices 時才執行，WebBLE 會自動跳過這段
+            // [Try Auto Connect]
             if (typeof navigator.bluetooth.getDevices === 'function') {
                 const savedId = localStorage.getItem('last_device_id');
                 if(savedId) {
@@ -303,12 +308,12 @@
                     if (match) {
                         rawLog(`Found saved device: ${match.name}. Reconnecting...`);
                         await bleConnect(match);
-                        return; // 自動連線成功，結束函數
+                        return;
                     }
                 }
             }
         
-            // [標準掃描] 如果沒有支援自動連線，或找不到舊設備
+            // [Manual Scan]
             rawLog("Scanning for new device...");
             const dev = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true, 
@@ -317,20 +322,14 @@
             await bleConnect(dev);
             
         } catch(e) {
-            ui.connectBtn.innerText = originalText; // 恢復按鈕文字
-            // 忽略 "User cancelled" 的錯誤，不顯示紅字
+            ui.connectBtn.innerText = originalText;
             if(!e.message.includes("cancelled")) {
                 rawLog(`Connect Fail: ${e.message}`, 'err');
             }
         }
     }
 
-    // --- Traffic Control Loop (DEBUGGING) ---
-    let lastWriteTime = 0;
-
-    // --- Traffic Control Loop (PATCH V36.1: Wake with 0x07) ---
     async function bleConnect(dev) {
-        // 儲存設備資訊
         localStorage.setItem('last_device_name', dev.name);
         localStorage.setItem('last_device_id', dev.id);
 
@@ -346,7 +345,7 @@
         await dataChar.startNotifications();
         dataChar.addEventListener('characteristicvaluechanged', parseData);
 
-        // Handshake Sequence (Ensure Wake)
+        // Handshake
         rawLog("Handshake: Request Control (0x00)...", 'tx');
         await sendHexDirect(0x00); 
         await sleep(200); 
@@ -359,6 +358,54 @@
         ui.btStatus.style.color = "#3b82f6";
         ui.connectBtn.style.display = 'none';
         rawLog("Connected!", 'succ');
+    }
+
+    // --- Traffic Control Loop (RESTORED) ---
+    // This was missing in your previous code
+    let lastWriteTime = 0;
+
+    async function bleSyncLoop() {
+        if(!controlChar) return;
+
+        if(isWriting && (Date.now() - lastWriteTime > 1000)) {
+            rawLog("Watchdog: Resetting isWriting lock", 'err');
+            isWriting = false;
+        }
+
+        if(isWriting) return;
+        
+        if(targetResistance !== sentResistance) {
+            isWriting = true;
+            lastWriteTime = Date.now();
+            
+            try {
+                if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
+
+                rawLog(`[TX] Waking (0x07) & Setting Res to ${targetResistance}...`, 'tx');
+                
+                // 1. Wake with 0x07 (Crucial for your bike)
+                await controlChar.writeValue(new Uint8Array([0x07]));
+                await sleep(50); 
+
+                // 2. Set Resistance (0x04)
+                const buf = new ArrayBuffer(3);
+                const v = new DataView(buf);
+                v.setUint8(0, 0x04); 
+                v.setUint16(1, targetResistance * 10, true); 
+                
+                await controlChar.writeValue(buf);
+                
+                rawLog(`[TX] 0x04 Written (Res: ${targetResistance})`, 'succ');
+                sentResistance = targetResistance;
+                lastCmdTime = Date.now();
+                
+            } catch(e) {
+                sentResistance = -99; 
+                rawLog(`TX ERROR: ${e.message}`, 'err');
+            } finally {
+                isWriting = false;
+            }
+        }
     }
     
     async function sendHexDirect(b) {
@@ -487,48 +534,37 @@
         refreshUI(); drawChart();
     }
 
-    let lastRxLevel = -1; // Debounce log
+    let lastRxLevel = -1; 
 
     function parseData(e) {
         const v = e.target.value;
         const f = v.getUint16(0, true);
         let off = 2;
 
-        // 1. Speed (Bit 0)
         if(!(f&1)) { 
             document.getElementById('spdVal').innerText = (v.getUint16(off,true)*0.01).toFixed(1); 
             off+=2; 
         }
-        // 2. Avg Speed (Bit 1)
         if(f&2) off+=2;
-        
-        // 3. Cadence (Bit 2)
         if(f&4) { 
             document.getElementById('rpmVal').innerText = Math.floor(v.getUint16(off,true)*0.5); 
             off+=2; 
         }
-        // 4. Avg Cadence (Bit 3)
         if(f&8) off+=2;
-        // 5. Distance (Bit 4)
         if(f&16) off+=3;
         
-        // 6. Resistance Level (Bit 5)
         if(f&32) {
             const realLevel = v.getInt16(off, true);
-            
-            // DEBUG LOG: Only log if value changes from what we last saw
             if(realLevel !== lastRxLevel) {
-                rawLog(`RX DATA: Bike reports Level ${realLevel}`, 'info');
+                rawLog(`RX DATA: Bike reports Level ${realLevel}`, 'dbg');
                 lastRxLevel = realLevel;
             }
-
             if (Date.now() - lastCmdTime > 3000) {
                 if(ui.res) ui.res.innerText = realLevel;
             }
             off+=2;
         }
         
-        // 7. Power (Bit 6)
         if(f&64) {
             document.getElementById('pwrVal').innerText = v.getInt16(off,true);
         }
@@ -658,7 +694,3 @@
 </script>
 </body>
 </html>
-
-
-
-
