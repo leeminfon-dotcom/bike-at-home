@@ -113,97 +113,34 @@
 
 <div class="app-container">
     <div class="sidebar">
-        <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">Fanbike V0.1</div>
-        <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
+    <div style="font-weight:bold; font-size:20px; margin-bottom:5px;">HORIZON V1.1</div>
+    <div id="btStatus" style="color:#666; margin-bottom:20px;">Disconnected</div>
 
-        <div class="dash-grid">
-            <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
-            <div class="mini-card"><div id="pwrVal" class="mini-val c-pwr">0</div><div class="mini-lbl">WATT</div></div>
-            <div class="mini-card"><div id="spdVal" class="mini-val c-spd">0.0</div><div class="mini-lbl">KMH</div></div>
-            <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LEVEL</div></div>
-        </div>
-
-        <button id="connectBtn" class="main-btn btn-connect">1. Connect</button>
-        <button id="startBtn" class="main-btn btn-start">START</button>
-        <div class="jump-row">
-            <button id="prevBtn" class="btn-jump">&lt; PREV</button>
-            <button id="nextBtn" class="btn-jump">NEXT &gt;</button>
-        </div>
-        <button id="stopBtn" class="main-btn btn-stop">STOP</button>
-        <button id="resetBtn" style="background:none; border:1px solid #555; color:#888; padding:8px; width:100%;">Reset Settings</button>
+    <div class="dash-grid">
+        <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">RPM</div></div>
+        <div class="mini-card"><div id="pwrVal" class="mini-val c-pwr">0</div><div class="mini-lbl">WATT</div></div>
+        <div class="mini-card"><div id="spdVal" class="mini-val c-spd">0.0</div><div class="mini-lbl">KMH</div></div>
+        <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">LEVEL</div></div>
     </div>
 
-    <div class="content">
-        <div class="chart-box"><canvas id="workoutChart"></canvas></div>
-        <div id="globalTimer" class="global-timer">00:00</div>
-        <div id="totalLabel" style="color:#666; margin-bottom:20px;">Total Time</div>
+    <button id="connectBtn" class="main-btn btn-connect">1. Connect</button>
+    <button id="startBtn" class="main-btn btn-start">START</button>
+    <button id="stopBtn" class="main-btn btn-stop">STOP</button>
+    </div>
 
-        <div class="phase-list">
-            <div id="card_warmup" class="phase-card">
-                <div class="phase-header"><span>WARM UP</span><span id="timer_warmup">00:00</span></div>
-                <div class="controls-row">
-                    <div class="control-group">
-                        <button id="btn_warmup_res_minus" class="ctrl-btn">-</button>
-                        <span id="val_res_warmup" style="font-weight:bold;">--</span>
-                        <button id="btn_warmup_res_plus" class="ctrl-btn">+</button>
-                    </div>
-                    <div class="control-group">
-                        <button id="btn_warmup_time_minus" class="ctrl-btn">-</button>
-                        <span id="val_time_warmup" style="font-weight:bold;">--</span>
-                        <button id="btn_warmup_time_plus" class="ctrl-btn">+</button>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="card_workout1" class="phase-card">
-                <div class="phase-header"><span>WORKOUT 1</span><span id="timer_workout1">00:00</span></div>
-                <div class="controls-row">
-                    <div class="control-group">
-                        <button id="btn_workout1_res_minus" class="ctrl-btn">-</button>
-                        <span id="val_res_workout1" style="font-weight:bold;">--</span>
-                        <button id="btn_workout1_res_plus" class="ctrl-btn">+</button>
-                    </div>
-                    <div class="control-group">
-                        <button id="btn_workout1_time_minus" class="ctrl-btn">-</button>
-                        <span id="val_time_workout1" style="font-weight:bold;">--</span>
-                        <button id="btn_workout1_time_plus" class="ctrl-btn">+</button>
-                    </div>
-                </div>
-            </div>
+<div class="content">
+    <div id="globalTimer" class="global-timer" style="font-size: 80px; margin-top: 50px;">00:00</div>
+    <div style="color:#666; margin-bottom:40px;">Elapsed Time</div>
 
-            <div id="card_workout2" class="phase-card">
-                <div class="phase-header"><span>WORKOUT 2</span><span id="timer_workout2">00:00</span></div>
-                <div class="controls-row">
-                    <div class="control-group">
-                        <button id="btn_workout2_res_minus" class="ctrl-btn">-</button>
-                        <span id="val_res_workout2" style="font-weight:bold;">--</span>
-                        <button id="btn_workout2_res_plus" class="ctrl-btn">+</button>
-                    </div>
-                    <div class="control-group">
-                        <button id="btn_workout2_time_minus" class="ctrl-btn">-</button>
-                        <span id="val_time_workout2" style="font-weight:bold;">--</span>
-                        <button id="btn_workout2_time_plus" class="ctrl-btn">+</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="card_cooldown" class="phase-card">
-                <div class="phase-header"><span>COOL DOWN</span><span id="timer_cooldown">00:00</span></div>
-                <div class="controls-row">
-                    <div class="control-group">
-                        <button id="btn_cooldown_res_minus" class="ctrl-btn">-</button>
-                        <span id="val_res_cooldown" style="font-weight:bold;">--</span>
-                        <button id="btn_cooldown_res_plus" class="ctrl-btn">+</button>
-                    </div>
-                    <div class="control-group">
-                        <button id="btn_cooldown_time_minus" class="ctrl-btn">-</button>
-                        <span id="val_time_cooldown" style="font-weight:bold;">--</span>
-                        <button id="btn_cooldown_time_plus" class="ctrl-btn">+</button>
-                    </div>
-                </div>
-            </div>
+    <div style="background: var(--surface); padding: 30px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center;">
+        <div style="color: var(--text-muted); margin-bottom: 15px;">MANUAL RESISTANCE</div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <button id="mainResMinus" class="ctrl-btn" style="width: 60px; height: 60px; font-size: 24px;">-</button>
+            <span id="mainResVal" style="font-size: 60px; font-weight: 800; color: var(--c-res);">1</span>
+            <button id="mainResPlus" class="ctrl-btn" style="width: 60px; height: 60px; font-size: 24px;">+</button>
         </div>
     </div>
+</div>
 </div>
 
 <script>
@@ -561,4 +498,5 @@
    
 </script>
 </body>
+
 </html>
