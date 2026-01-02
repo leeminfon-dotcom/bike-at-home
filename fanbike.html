@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fanbike V0.97</title>
+    <title>Fanbike V0.98 (Fix)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -109,7 +109,7 @@
 </head>
 <body>
 
-<div id="debug-console">V0.97 Init...</div>
+<div id="debug-console">V0.98 Init...</div>
 
 <div id="toast-box">
     <div id="t-lbl" class="toast-lbl">LEVEL</div>
@@ -119,7 +119,7 @@
 <div class="app-container">
     <div class="content">
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="font-weight:bold; font-size:20px;">Fanbike V0.97</div>
+            <div style="font-weight:bold; font-size:20px;">Fanbike V0.98</div>
             <div id="btStatus" style="color:#666; font-size:14px;">Disconnected</div>
         </div>
 
@@ -180,7 +180,7 @@
                 </div>
             </div>
             <div style="font-size:11px; color:#666; margin-top:15px; text-align:center;">
-                Smart Momentum: Prevents resistance drop during momentary cadence dips.
+                Fixed: Threshold Logic Deadlock
             </div>
         </div>
     </div>
@@ -256,7 +256,7 @@
         if(syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(bleSyncLoop, 250);
         
-        rawLog("System Ready (V0.97).");
+        rawLog("System Ready (V0.98).");
     }
 
     function safeBind(id, fn) {
@@ -465,37 +465,44 @@
         toastTimer = setTimeout(() => { ui.toast.classList.remove('show'); }, 2000);
     }
 
+    // --- V0.98 FIX: LOGIC ORDER ---
     function calcFanResistance(realRpm) {
         if (realRpm >= 10) {
             lastActiveTime = Date.now(); 
             
+            // 1. Smooth RPM (Momentum)
             let alpha = (realRpm > smoothedRpm) ? 0.4 : 0.1;
             smoothedRpm = (smoothedRpm * (1 - alpha)) + (realRpm * alpha);
             
+            // 2. Calc Ideal Level
             let ratio = smoothedRpm / fanConfig.targetRpm;
-            let rawLevel = Math.round(fanConfig.max * Math.pow(ratio, 2));
+            let idealLevel = Math.round(fanConfig.max * Math.pow(ratio, 2));
             
-            if(rawLevel < 1) rawLevel = 1;
-            if(rawLevel > fanConfig.max) rawLevel = fanConfig.max;
+            if(idealLevel < 1) idealLevel = 1;
+            if(idealLevel > fanConfig.max) idealLevel = fanConfig.max;
             
-            if (rawLevel > targetResistance + 2) rawLevel = targetResistance + 2;
-            if (rawLevel < targetResistance - 2) rawLevel = targetResistance - 2;
-
-            let diff = Math.abs(rawLevel - targetResistance);
+            // 3. Check Threshold FIRST (Avoid Deadlock)
+            let diff = Math.abs(idealLevel - targetResistance);
             let threshold = fanConfig.max * 0.10; 
 
             if(diff > threshold) {
-                const isUp = rawLevel > targetResistance;
-                targetResistance = rawLevel;
+                // 4. Apply Step Limiter to the MOVEMENT
+                let nextLevel = idealLevel;
+                if (nextLevel > targetResistance + 2) nextLevel = targetResistance + 2;
+                if (nextLevel < targetResistance - 2) nextLevel = targetResistance - 2;
+
+                const isUp = nextLevel > targetResistance;
+                targetResistance = nextLevel;
+                
+                // UI Authority
                 if(ui.res) ui.res.innerText = targetResistance;
                 
-                showLevelToast(rawLevel, isUp);
-                rawLog(`Fan: ${realRpm}rpm (Sim:${Math.round(smoothedRpm)}) -> Lv${rawLevel}`);
+                showLevelToast(targetResistance, isUp);
+                rawLog(`Fan: ${realRpm}rpm (Sim:${Math.round(smoothedRpm)}) -> Lv${targetResistance}`);
             }
         } 
         else {
             smoothedRpm = smoothedRpm * 0.9; 
-            
             if (Date.now() - lastActiveTime > 4000) {
                 if(targetResistance !== 1) {
                     targetResistance = 1;
@@ -527,7 +534,6 @@
         
         if(f&4) { 
             const rawRpm = Math.floor(v.getUint16(off,true) * 0.5); 
-            
             if(rawRpm > 0 || !isCmdActive) {
                 currentRpm = rawRpm;
                 document.getElementById('rpmVal').innerText = currentRpm;
@@ -540,8 +546,7 @@
         
         if(f&32) {
             const realLevel = v.getInt16(off, true);
-            // V0.96 Logic: If Fan Mode, ignore bluetooth level feedback completely
-            // V0.97 Logic: If NOT Fan Mode, still filter 0 glitches
+            // V0.96 Logic: If Fan Mode, ignore bluetooth level feedback
             if (!isFanMode && realLevel > 0 && !isCmdActive) {
                 if(ui.res) ui.res.innerText = realLevel;
             }
