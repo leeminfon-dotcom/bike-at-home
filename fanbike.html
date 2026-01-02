@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fanbike V0.4 Patch</title>
+    <title>Fanbike V0.5</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -75,11 +75,7 @@
             box-sizing: border-box;
         }
 
-        /* Modified Button Row - Only Connect remains */
-        .btn-row {
-            width: 100%;
-            margin-bottom: 20px;
-        }
+        .btn-row { width: 100%; margin-bottom: 20px; }
 
         .dash-grid { 
             display: grid; 
@@ -113,16 +109,37 @@
         .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: #06b6d4; }
         input:checked + .slider:before { transform: translateX(16px); }
+
+        /* New Stepper Styles for V0.5 */
+        .stepper {
+            display: flex;
+            align-items: center;
+            background: #334155;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .stepper button {
+            background: #475569; border: none; color: white;
+            width: 40px; height: 40px; font-size: 18px; cursor: pointer;
+        }
+        .stepper button:active { background: #64748b; }
+        .stepper input {
+            flex: 1; background: transparent; border: none; color: white;
+            text-align: center; font-size: 16px; font-weight: bold;
+            width: 50px; /* fixed width for stability */
+        }
+        /* Remove arrows from number input */
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
 </head>
 <body>
 
-<div id="debug-console">V0.4 Init...</div>
+<div id="debug-console">V0.5 Init...</div>
 
 <div class="app-container">
     <div class="content">
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="font-weight:bold; font-size:20px;">Fanbike V0.4</div>
+            <div style="font-weight:bold; font-size:20px;">Fanbike V0.5</div>
             <div id="btStatus" style="color:#666; font-size:14px;">Disconnected</div>
         </div>
 
@@ -151,18 +168,22 @@
                 </label>
             </div>
         
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+            <div style="display:grid; grid-template-columns: 1fr 1.2fr; gap:15px; align-items: end;">
                 <div>
                     <div style="font-size:12px; color:#94a3b8; margin-bottom:5px;">Max Level</div>
                     <input type="number" id="cfgMaxLevel" value="32" style="width:100%; background:#334155; border:none; color:white; padding:10px; border-radius:8px; text-align:center; box-sizing:border-box;">
                 </div>
                 <div>
                     <div style="font-size:12px; color:#94a3b8; margin-bottom:5px;">Level @ 50RPM</div>
-                    <input type="number" id="cfgBaseLevel" value="4" style="width:100%; background:#334155; border:none; color:white; padding:10px; border-radius:8px; text-align:center; box-sizing:border-box;">
+                    <div class="stepper">
+                        <button id="btnBaseMinus">-</button>
+                        <input type="number" id="cfgBaseLevel" value="4" readonly>
+                        <button id="btnBasePlus">+</button>
+                    </div>
                 </div>
             </div>
-            <div style="font-size:11px; color:#666; margin-top:10px; text-align:center;">
-                Resistance adjusts automatically based on RPM²
+            <div style="font-size:11px; color:#666; margin-top:15px; text-align:center;">
+                Threshold: Change only if diff > 10% of Max
             </div>
         </div>
 
@@ -186,7 +207,6 @@
     let workoutInterval;
     let workoutSeconds = 0;
 
-    // Requirement 4: Fan Mode default true
     let isFanMode = true;
     let currentRpm = 0;
     let fanConfig = { max: 32, base: 4 };
@@ -213,7 +233,10 @@
         // Fan Mode Bindings
         safeBind('fanModeToggle', toggleFanMode);
         document.getElementById('cfgMaxLevel').addEventListener('input', updateFanConfig);
-        document.getElementById('cfgBaseLevel').addEventListener('input', updateFanConfig);
+        
+        // Req 1: New Button Bindings
+        safeBind('btnBaseMinus', () => adjustBaseLevel(-1));
+        safeBind('btnBasePlus', () => adjustBaseLevel(1));
         
         // Initial Config
         updateFanConfig();
@@ -222,7 +245,7 @@
         if(syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(bleSyncLoop, 250);
         
-        rawLog("System Ready (Auto Start).");
+        rawLog("System Ready (Threshold Mode).");
     }
 
     function safeBind(id, fn) {
@@ -264,7 +287,6 @@
             ui.connectBtn.style.display = 'none';
             rawLog("Connected!", 'succ');
 
-            // Requirement 1 & 2: Auto start workout upon connection
             startWorkout();
             
         } catch(e) {
@@ -328,27 +350,20 @@
 
     // --- 4. WORKOUT LOGIC ---
     function startWorkout() {
-        // Auto Wake
         sendHexDirect(0x07); 
-        
         workoutSeconds = 0; 
         currentStatus = 'RUNNING';
-        
         if(workoutInterval) clearInterval(workoutInterval);
         workoutInterval = setInterval(timerLoop, 1000);
-        
-        sentResistance = -99; // Force resend
+        sentResistance = -99; 
         rawLog("Workout Auto-Started.");
     }
 
     function stopWorkout() {
         currentStatus = 'IDLE';
         clearInterval(workoutInterval);
-        
-        // Reset Bike
         targetResistance = 1; 
         if(ui.res) ui.res.innerText = targetResistance;
-        
         rawLog("Stopped.");
     }
 
@@ -358,7 +373,6 @@
     }
 
     // --- 5. DATA & UI ---
-
     function fmt(s) {
         let m=Math.floor(s/60), sec=s%60;
         return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
@@ -371,6 +385,17 @@
         updateFanConfig();
     }
     
+    // Req 1: Adjust Base Level with Buttons
+    function adjustBaseLevel(delta) {
+        let el = document.getElementById('cfgBaseLevel');
+        let val = parseInt(el.value) || 4;
+        val += delta;
+        if(val < 1) val = 1;
+        if(val > 32) val = 32;
+        el.value = val;
+        updateFanConfig();
+    }
+
     function updateFanConfig() {
         const max = parseInt(document.getElementById('cfgMaxLevel').value) || 32;
         const base = parseInt(document.getElementById('cfgBaseLevel').value) || 4;
@@ -379,7 +404,15 @@
     }
     
     function calcFanResistance(rpm) {
-        if(rpm < 10) return; 
+        // Stop condition: Always force level 1 if stopped, ignoring threshold
+        if(rpm < 10) {
+            if(targetResistance !== 1) {
+                targetResistance = 1;
+                if(ui.res) ui.res.innerText = 1;
+                rawLog("Fan: Stopped -> Lv1");
+            }
+            return;
+        } 
         
         let ratio = rpm / 50;
         let newLevel = Math.round(fanConfig.base * (ratio * ratio));
@@ -387,10 +420,18 @@
         if(newLevel < 1) newLevel = 1;
         if(newLevel > fanConfig.max) newLevel = fanConfig.max;
         
-        if(newLevel !== targetResistance) {
+        // Req 2: Threshold Logic
+        // Calculate the difference magnitude
+        let diff = Math.abs(newLevel - targetResistance);
+        
+        // Calculate Threshold: 10% of TOTAL level (Max Level)
+        // e.g., if Max=32, Threshold=3.2. Change only happens if diff > 3.2
+        let threshold = fanConfig.max * 0.10;
+
+        if(diff > threshold) {
             targetResistance = newLevel;
             if(ui.res) ui.res.innerText = targetResistance;
-            // rawLog(`Fan: ${rpm}rpm -> Lv${newLevel}`); // Optional log
+            rawLog(`Fan: ${rpm}rpm -> Lv${newLevel} (Diff:${diff} > ${threshold.toFixed(1)})`); 
         }
     }
     
@@ -399,9 +440,6 @@
         const f = v.getUint16(0, true);
         let off = 2;
 
-        // Requirement 3: Prevent 0-flickering (Data stabilization)
-
-        // 1. Speed (Bit 0)
         if(!(f&1)) { 
             const spd = (v.getUint16(off,true)*0.01).toFixed(1);
             document.getElementById('spdVal').innerText = spd;
@@ -409,12 +447,9 @@
         }
         if(f&2) off+=2;
         
-        // 2. Cadence/RPM (Bit 2)
         if(f&4) { 
             const rawRpm = v.getUint16(off,true);
             currentRpm = Math.floor(rawRpm * 0.5); 
-            
-            // Only update UI if legitimate (or 0 is intentional)
             document.getElementById('rpmVal').innerText = currentRpm;
             
             if(isFanMode) {
@@ -426,22 +461,16 @@
         if(f&8) off+=2;
         if(f&16) off+=3;
         
-        // 3. Resistance Level (Bit 5)
         if(f&32) {
             const realLevel = v.getInt16(off, true);
-            
-            // Fix for Req 3: Only update if realLevel > 0 to prevent 0-flicker
-            // And ensure we are not currently writing a new value
             if (Date.now() - lastCmdTime > 3000) {
                 if(ui.res && realLevel > 0) ui.res.innerText = realLevel;
             }
             off+=2; 
         }
         
-        // 4. Power (Bit 6)
         if(f&64) {
             const pwr = v.getInt16(off,true);
-            // Simple filter for power
             document.getElementById('pwrVal').innerText = pwr;
         }
     }
