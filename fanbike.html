@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fanbike V0.6</title>
+    <title>Fanbike V0.7</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -29,6 +29,7 @@
             --bg: #0f172a; --sidebar: #1e293b; --surface: #334155;
             --primary: #3b82f6; --text: #f8fafc; --text-muted: #94a3b8;
             --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899;
+            --c-warn: #f59e0b; --c-stop: #ef4444;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -39,7 +40,7 @@
 
         /* Console */
         #debug-console {
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 160px;
+            position: fixed; bottom: 0; left: 0; width: 100%; height: 120px;
             background: rgba(0,0,0,0.95); color: #ccc; border-top: 2px solid #555;
             font-size: 11px; padding: 10px; overflow-y: scroll; font-family: monospace;
             z-index: 99999; box-sizing: border-box; white-space: pre-wrap;
@@ -67,7 +68,7 @@
             max-width: 600px;
             margin: 0 auto;
             padding: 20px;
-            padding-bottom: 200px; 
+            padding-bottom: 160px; 
             
             display: flex; 
             flex-direction: column; 
@@ -75,7 +76,7 @@
             box-sizing: border-box;
         }
 
-        .btn-row { width: 100%; margin-bottom: 20px; }
+        .btn-row { width: 100%; margin-bottom: 15px; }
 
         .dash-grid { 
             display: grid; 
@@ -100,7 +101,32 @@
         }
         .btn-connect { background: var(--primary); }
         
-        .global-timer { font-size: 40px; font-weight: bold; margin-bottom: 5px; }
+        /* Timer Section Styles */
+        .timer-box {
+            text-align: center;
+            margin-bottom: 30px;
+            width: 100%;
+        }
+        .global-timer { font-size: 60px; font-weight: bold; margin: 5px 0; line-height: 1; font-variant-numeric: tabular-nums;}
+        .timer-label { font-size: 14px; color: var(--text-muted); margin-bottom: 10px; }
+        
+        .timer-controls {
+            display: flex; justify-content: center; gap: 15px; margin-top: 10px;
+        }
+        .action-btn {
+            padding: 10px 20px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; font-size: 14px;
+        }
+        .btn-pause { background: var(--c-warn); }
+        .btn-resume { background: var(--c-rpm); }
+        .btn-restart { background: var(--surface); border: 1px solid #64748b; }
+        
+        .time-adj-row {
+            display: flex; justify-content: center; align-items: center; gap: 15px; font-size: 14px; color: #94a3b8;
+        }
+        .adj-btn {
+            background: transparent; border: 1px solid #475569; color: #94a3b8; 
+            border-radius: 4px; padding: 2px 8px; cursor: pointer;
+        }
 
         /* Switch & Slider Styles */
         .switch { position: relative; display: inline-block; width: 40px; height: 24px; margin-right: 10px; }
@@ -112,33 +138,26 @@
 
         /* Stepper Styles */
         .stepper {
-            display: flex;
-            align-items: center;
-            background: #334155;
-            border-radius: 8px;
-            overflow: hidden;
+            display: flex; align-items: center; background: #334155; border-radius: 8px; overflow: hidden;
         }
         .stepper button {
-            background: #475569; border: none; color: white;
-            width: 40px; height: 40px; font-size: 18px; cursor: pointer;
+            background: #475569; border: none; color: white; width: 40px; height: 40px; font-size: 18px; cursor: pointer;
         }
         .stepper button:active { background: #64748b; }
         .stepper input {
-            flex: 1; background: transparent; border: none; color: white;
-            text-align: center; font-size: 16px; font-weight: bold;
-            width: 50px; 
+            flex: 1; background: transparent; border: none; color: white; text-align: center; font-size: 16px; font-weight: bold; width: 50px; 
         }
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
 </head>
 <body>
 
-<div id="debug-console">V0.6 Init...</div>
+<div id="debug-console">V0.7 Init...</div>
 
 <div class="app-container">
     <div class="content">
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="font-weight:bold; font-size:20px;">Fanbike V0.6</div>
+            <div style="font-weight:bold; font-size:20px;">Fanbike V0.7</div>
             <div id="btStatus" style="color:#666; font-size:14px;">Disconnected</div>
         </div>
 
@@ -155,10 +174,23 @@
 
         <hr style="width:100%; border:0; border-top:1px solid #334155; margin: 20px 0;">
 
-        <div id="globalTimer" class="global-timer">00:00</div>
-        <div style="color:#666; margin-bottom:40px;">Elapsed Time</div>
+        <div class="timer-box">
+            <div class="time-adj-row">
+                <button id="btnTimeMinus" class="adj-btn">- 5m</button>
+                <span>TARGET TIME</span>
+                <button id="btnTimePlus" class="adj-btn">+ 5m</button>
+            </div>
+            
+            <div id="globalTimer" class="global-timer">30:00</div>
+            <div id="elapsedLabel" class="timer-label">Elapsed: 00:00</div>
 
-        <div style="background: #1e293b; padding: 20px; border-radius: 20px; width: 100%; border: 1px solid #475569; margin-top: 20px;">
+            <div class="timer-controls">
+                <button id="btnPause" class="action-btn btn-pause">PAUSE</button>
+                <button id="btnRestart" class="action-btn btn-restart">RESTART</button>
+            </div>
+        </div>
+
+        <div style="background: #1e293b; padding: 20px; border-radius: 20px; width: 100%; border: 1px solid #475569; margin-top: 10px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                 <span style="color:#06b6d4; font-weight:bold;">FAN BIKE MODE</span>
                 <label class="switch">
@@ -182,8 +214,7 @@
                 </div>
             </div>
             <div style="font-size:11px; color:#666; margin-top:15px; text-align:center;">
-                Reach Max Level at Target RPM<br>
-                (Threshold: 10% of Max)
+                Reach Max Level at Target RPM
             </div>
         </div>
 
@@ -197,7 +228,7 @@
     const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
 
     let controlChar = null;
-    let currentStatus = 'IDLE'; 
+    let currentStatus = 'IDLE'; // IDLE, RUNNING, PAUSED
     
     let targetResistance = 1; 
     let sentResistance = -99; 
@@ -205,11 +236,14 @@
     let lastCmdTime = 0;
     let syncInterval = null;
     let workoutInterval;
-    let workoutSeconds = 0;
+    
+    // Time Vars
+    let workoutSeconds = 0; // Total Elapsed
+    let targetDurationMins = 30; // Default 30 mins
+    let remainingSeconds = 30 * 60;
 
     let isFanMode = true;
     let currentRpm = 0;
-    // V0.6 Config: Target RPM logic
     let fanConfig = { max: 32, targetRpm: 90 }; 
     
     let lastActiveTime = Date.now();
@@ -226,7 +260,9 @@
             btStatus: document.getElementById('btStatus'),
             connectBtn: document.getElementById('connectBtn'),
             globalTimer: document.getElementById('globalTimer'),
-            res: document.getElementById('resVal')
+            elapsedLabel: document.getElementById('elapsedLabel'),
+            res: document.getElementById('resVal'),
+            btnPause: document.getElementById('btnPause')
         };
 
         if(!ui.connectBtn) throw new Error("UI Load Fail");
@@ -236,17 +272,24 @@
         safeBind('fanModeToggle', toggleFanMode);
         document.getElementById('cfgMaxLevel').addEventListener('input', updateFanConfig);
         
-        // V0.6 Button Logic (+/- 5 RPM)
+        // RPM Target Buttons
         safeBind('btnTargetMinus', () => adjustTargetRpm(-5));
         safeBind('btnTargetPlus', () => adjustTargetRpm(5));
         
+        // Timer Buttons (New in V0.7)
+        safeBind('btnTimeMinus', () => adjustTime(-5));
+        safeBind('btnTimePlus', () => adjustTime(5));
+        safeBind('btnPause', togglePause);
+        safeBind('btnRestart', restartWorkout);
+
         loadSettings();
         updateFanConfig();
+        updateTimerDisplay(); // Init Display
 
         if(syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(bleSyncLoop, 250);
         
-        rawLog("System Ready (V0.6 RPM Target).");
+        rawLog("System Ready (Timer Added).");
     }
 
     function safeBind(id, fn) {
@@ -275,15 +318,13 @@
             await dataChar.startNotifications();
             dataChar.addEventListener('characteristicvaluechanged', parseData);
 
-            rawLog("Handshake: Request Control...", 'tx');
+            rawLog("Handshake...", 'tx');
             await sendHexDirect(0x00); 
-            await sleep(200); 
-            
-            rawLog("Handshake: Start/Resume...", 'tx');
+            await sleep(100); 
             await sendHexDirect(0x07);
-            await sleep(200);
+            await sleep(100);
 
-            ui.btStatus.innerText = "Connected: " + dev.name;
+            ui.btStatus.innerText = "Connected";
             ui.btStatus.style.color = "#3b82f6";
             ui.connectBtn.style.display = 'none';
             rawLog("Connected!", 'succ');
@@ -300,12 +341,7 @@
 
     async function bleSyncLoop() {
         if(!controlChar) return;
-
-        if(isWriting && (Date.now() - lastWriteTime > 1000)) {
-            rawLog("Watchdog: Resetting isWriting lock", 'err');
-            isWriting = false;
-        }
-
+        if(isWriting && (Date.now() - lastWriteTime > 1000)) isWriting = false;
         if(isWriting) return;
         
         if(targetResistance !== sentResistance) {
@@ -313,66 +349,122 @@
             lastWriteTime = Date.now();
             try {
                 if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
-
                 await controlChar.writeValue(new Uint8Array([0x07]));
                 await sleep(50); 
-
                 const buf = new ArrayBuffer(3);
                 const v = new DataView(buf);
-                v.setUint8(0, 0x04); // OpCode
-                v.setUint16(1, targetResistance * 10, true); // Value
-                
+                v.setUint8(0, 0x04); 
+                v.setUint16(1, targetResistance * 10, true); 
                 await controlChar.writeValue(buf);
-                
                 sentResistance = targetResistance;
-                lastCmdTime = Date.now();
-                
-            } catch(e) {
-                sentResistance = -99; 
-                rawLog(`TX ERROR: ${e.message}`, 'err');
-            } finally {
-                isWriting = false;
-            }
+            } catch(e) { sentResistance = -99; } 
+            finally { isWriting = false; }
         }
     }
     
     async function sendHexDirect(b) {
-        if(controlChar) await controlChar.writeValue(new Uint8Array([b])).catch(e=>rawLog("HexErr:"+e));
+        if(controlChar) await controlChar.writeValue(new Uint8Array([b])).catch(e=>{});
     }
     
     function onDisconnect() {
         ui.btStatus.innerText = "Disconnected";
         ui.btStatus.style.color = "#666";
         ui.connectBtn.style.display = 'block';
-        stopWorkout();
+        currentStatus = 'IDLE';
+        if(workoutInterval) clearInterval(workoutInterval);
         rawLog("Device Disconnected", 'err');
     }
 
-    // --- 4. WORKOUT LOGIC ---
+    // --- 4. TIMER & WORKOUT LOGIC ---
+    
     function startWorkout() {
         sendHexDirect(0x07); 
-        workoutSeconds = 0; 
+        currentStatus = 'RUNNING';
+        updatePauseBtn();
+        
+        // Start Interval
+        if(workoutInterval) clearInterval(workoutInterval);
+        workoutInterval = setInterval(timerLoop, 1000);
+        
+        rawLog("Workout Started.");
+    }
+
+    function togglePause() {
+        if(currentStatus === 'RUNNING') {
+            currentStatus = 'PAUSED';
+            if(workoutInterval) clearInterval(workoutInterval);
+            rawLog("Paused.");
+        } else {
+            currentStatus = 'RUNNING';
+            if(workoutInterval) clearInterval(workoutInterval);
+            workoutInterval = setInterval(timerLoop, 1000);
+            rawLog("Resumed.");
+        }
+        updatePauseBtn();
+    }
+
+    function restartWorkout() {
+        // Reset Logic
+        workoutSeconds = 0; // Elapsed Reset
+        remainingSeconds = targetDurationMins * 60; // Countdown Reset
+        
+        // Ensure Running
         currentStatus = 'RUNNING';
         if(workoutInterval) clearInterval(workoutInterval);
         workoutInterval = setInterval(timerLoop, 1000);
-        sentResistance = -99; 
-        rawLog("Workout Auto-Started.");
-    }
-
-    function stopWorkout() {
-        currentStatus = 'IDLE';
-        clearInterval(workoutInterval);
-        targetResistance = 1; 
-        if(ui.res) ui.res.innerText = targetResistance;
-        rawLog("Stopped.");
+        
+        updatePauseBtn();
+        updateTimerDisplay();
+        rawLog("Restarted.");
     }
 
     function timerLoop() {
+        if(currentStatus !== 'RUNNING') return;
+
         workoutSeconds++;
-        ui.globalTimer.innerText = fmt(workoutSeconds);
+        
+        if(remainingSeconds > 0) {
+            remainingSeconds--;
+        } else {
+            // Timer Finished logic? For now just stay at 0
+            remainingSeconds = 0;
+        }
+        
+        updateTimerDisplay();
     }
 
-    // --- 5. DATA & UI ---
+    function adjustTime(delta) {
+        targetDurationMins += delta;
+        if(targetDurationMins < 5) targetDurationMins = 5;
+        if(targetDurationMins > 180) targetDurationMins = 180;
+        
+        // Update remaining time based on change
+        remainingSeconds += (delta * 60);
+        if(remainingSeconds < 0) remainingSeconds = 0;
+        
+        updateTimerDisplay();
+        rawLog(`Target Time: ${targetDurationMins}m`);
+    }
+
+    function updateTimerDisplay() {
+        ui.globalTimer.innerText = fmt(remainingSeconds);
+        ui.elapsedLabel.innerText = "Elapsed: " + fmt(workoutSeconds);
+        
+        if(remainingSeconds === 0) ui.globalTimer.style.color = "#ef4444";
+        else ui.globalTimer.style.color = "#f8fafc";
+    }
+
+    function updatePauseBtn() {
+        if(currentStatus === 'RUNNING') {
+            ui.btnPause.innerText = "PAUSE";
+            ui.btnPause.className = "action-btn btn-pause";
+        } else {
+            ui.btnPause.innerText = "RESUME";
+            ui.btnPause.className = "action-btn btn-resume";
+        }
+    }
+
+    // --- 5. FAN BIKE LOGIC ---
     function fmt(s) {
         let m=Math.floor(s/60), sec=s%60;
         return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
@@ -380,59 +472,44 @@
 
     function toggleFanMode(e) {
         isFanMode = e.target.checked;
-        rawLog(isFanMode ? "Fan Mode: ON" : "Fan Mode: OFF");
         updateFanConfig();
     }
     
-    // V0.6 Adjustment Logic
     function adjustTargetRpm(delta) {
         let el = document.getElementById('cfgTargetRpm');
         let val = parseInt(el.value) || 90;
-        
         val += delta;
-        
-        if(val < 40) val = 40; // Logical minimum
-        if(val > 200) val = 200; // Logical maximum
-        
+        if(val < 40) val = 40; 
+        if(val > 200) val = 200; 
         el.value = val;
         updateFanConfig();
     }
 
-    // V0.6 Storage Keys
     function loadSettings() {
         try {
             const sMax = localStorage.getItem('fan_max');
             const sTarget = localStorage.getItem('fan_target_rpm');
-            
             if(sMax) document.getElementById('cfgMaxLevel').value = sMax;
             if(sTarget) document.getElementById('cfgTargetRpm').value = sTarget;
-            else document.getElementById('cfgTargetRpm').value = 90; 
-        } catch(e) { console.error(e); }
+        } catch(e) {}
     }
 
     function updateFanConfig() {
         const max = parseInt(document.getElementById('cfgMaxLevel').value) || 32;
         const targetRpm = parseInt(document.getElementById('cfgTargetRpm').value) || 90;
-        
         try {
             localStorage.setItem('fan_max', max);
             localStorage.setItem('fan_target_rpm', targetRpm);
         } catch(e) {}
-
         fanConfig = { max, targetRpm };
         if(isFanMode && currentRpm > 0) calcFanResistance(currentRpm);
     }
     
-    // V0.6 Calculation Formula
     function calcFanResistance(rpm) {
-        // 1. Valid Pedaling
         if (rpm >= 10) {
             lastActiveTime = Date.now(); 
-            
-            // Formula: Max * (CurrentRPM / TargetRPM)^2
             let ratio = rpm / fanConfig.targetRpm;
             let newLevel = Math.round(fanConfig.max * Math.pow(ratio, 2));
-            
             if(newLevel < 1) newLevel = 1;
             if(newLevel > fanConfig.max) newLevel = fanConfig.max;
             
@@ -442,16 +519,12 @@
             if(diff > threshold) {
                 targetResistance = newLevel;
                 if(ui.res) ui.res.innerText = targetResistance;
-                rawLog(`Fan: ${rpm}rpm -> Lv${newLevel}`); 
             }
-        } 
-        // 2. Stop Logic (4s Debounce)
-        else {
+        } else {
             if (Date.now() - lastActiveTime > 4000) {
                 if(targetResistance !== 1) {
                     targetResistance = 1;
                     if(ui.res) ui.res.innerText = 1;
-                    rawLog("Fan: Stopped -> Lv1");
                 }
             }
         }
@@ -463,26 +536,18 @@
         let off = 2;
 
         if(!(f&1)) { 
-            const spd = (v.getUint16(off,true)*0.01).toFixed(1);
-            document.getElementById('spdVal').innerText = spd;
+            document.getElementById('spdVal').innerText = (v.getUint16(off,true)*0.01).toFixed(1);
             off+=2; 
         }
         if(f&2) off+=2;
-        
         if(f&4) { 
-            const rawRpm = v.getUint16(off,true);
-            currentRpm = Math.floor(rawRpm * 0.5); 
+            currentRpm = Math.floor(v.getUint16(off,true) * 0.5); 
             document.getElementById('rpmVal').innerText = currentRpm;
-            
-            if(isFanMode) {
-                calcFanResistance(currentRpm);
-            }
+            if(isFanMode) calcFanResistance(currentRpm);
             off+=2; 
         }
-        
         if(f&8) off+=2;
         if(f&16) off+=3;
-        
         if(f&32) {
             const realLevel = v.getInt16(off, true);
             if (Date.now() - lastCmdTime > 3000) {
@@ -490,11 +555,7 @@
             }
             off+=2; 
         }
-        
-        if(f&64) {
-            const pwr = v.getInt16(off,true);
-            document.getElementById('pwrVal').innerText = pwr;
-        }
+        if(f&64) document.getElementById('pwrVal').innerText = v.getInt16(off,true);
     }
 
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
