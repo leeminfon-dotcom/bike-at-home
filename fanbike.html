@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fanbike V0.7</title>
+    <title>Fanbike V0.9</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -30,6 +30,8 @@
             --primary: #3b82f6; --text: #f8fafc; --text-muted: #94a3b8;
             --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899;
             --c-warn: #f59e0b; --c-stop: #ef4444;
+            --c-up: #facc15; /* Yellow for increase */
+            --c-down: #4ade80; /* Green for decrease */
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -107,7 +109,7 @@
             margin-bottom: 30px;
             width: 100%;
         }
-        .global-timer { font-size: 60px; font-weight: bold; margin: 5px 0; line-height: 1; font-variant-numeric: tabular-nums;}
+        .global-timer { font-size: 40px; font-weight: bold; margin: 5px 0; line-height: 1; font-variant-numeric: tabular-nums;}
         .timer-label { font-size: 14px; color: var(--text-muted); margin-bottom: 10px; }
         
         .timer-controls {
@@ -148,16 +150,46 @@
             flex: 1; background: transparent; border: none; color: white; text-align: center; font-size: 16px; font-weight: bold; width: 50px; 
         }
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+        /* TOAST NOTIFICATION */
+        #toast-box {
+            position: fixed;
+            top: 25%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-50%);
+            background: rgba(15, 23, 42, 0.95);
+            border: 2px solid #475569;
+            padding: 20px 40px;
+            border-radius: 20px;
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease-in-out;
+            z-index: 9999;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            min-width: 150px;
+        }
+        #toast-box.show { opacity: 1; transform: translateX(-50%) translateY(-50%) scale(1.1); }
+        .toast-val { font-size: 48px; font-weight: 900; line-height: 1; margin-top: 5px; }
+        .toast-lbl { font-size: 14px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
+        
+        .t-up { color: var(--c-up); }
+        .t-down { color: var(--c-down); }
     </style>
 </head>
 <body>
 
-<div id="debug-console">V0.7 Init...</div>
+<div id="debug-console">V0.9 Init...</div>
+
+<div id="toast-box">
+    <div id="t-lbl" class="toast-lbl">LEVEL</div>
+    <div id="t-val" class="toast-val">--</div>
+</div>
 
 <div class="app-container">
     <div class="content">
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="font-weight:bold; font-size:20px;">Fanbike V0.7</div>
+            <div style="font-weight:bold; font-size:20px;">Fanbike V0.9</div>
             <div id="btStatus" style="color:#666; font-size:14px;">Disconnected</div>
         </div>
 
@@ -198,6 +230,14 @@
                     <span class="slider"></span>
                 </label>
             </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <span style="color:#94a3b8; font-size:14px; font-weight:bold;">LEVEL POPUP</span>
+                <label class="switch">
+                    <input type="checkbox" id="toastToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
         
             <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:15px; align-items: end;">
                 <div>
@@ -228,7 +268,7 @@
     const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
 
     let controlChar = null;
-    let currentStatus = 'IDLE'; // IDLE, RUNNING, PAUSED
+    let currentStatus = 'IDLE'; 
     
     let targetResistance = 1; 
     let sentResistance = -99; 
@@ -238,15 +278,17 @@
     let workoutInterval;
     
     // Time Vars
-    let workoutSeconds = 0; // Total Elapsed
-    let targetDurationMins = 30; // Default 30 mins
+    let workoutSeconds = 0; 
+    let targetDurationMins = 30; 
     let remainingSeconds = 30 * 60;
 
     let isFanMode = true;
+    let isToastEnabled = true; // V0.9 New Flag
     let currentRpm = 0;
     let fanConfig = { max: 32, targetRpm: 90 }; 
     
     let lastActiveTime = Date.now();
+    let toastTimer = null;
     let ui = {};
 
     // --- 2. STARTUP ---
@@ -262,7 +304,11 @@
             globalTimer: document.getElementById('globalTimer'),
             elapsedLabel: document.getElementById('elapsedLabel'),
             res: document.getElementById('resVal'),
-            btnPause: document.getElementById('btnPause')
+            btnPause: document.getElementById('btnPause'),
+            // Toast UI
+            toast: document.getElementById('toast-box'),
+            tVal: document.getElementById('t-val'),
+            tLbl: document.getElementById('t-lbl')
         };
 
         if(!ui.connectBtn) throw new Error("UI Load Fail");
@@ -270,13 +316,13 @@
         safeBind('connectBtn', startScan);
         
         safeBind('fanModeToggle', toggleFanMode);
+        safeBind('toastToggle', toggleToast); // V0.9 Binding
+        
         document.getElementById('cfgMaxLevel').addEventListener('input', updateFanConfig);
         
-        // RPM Target Buttons
         safeBind('btnTargetMinus', () => adjustTargetRpm(-5));
         safeBind('btnTargetPlus', () => adjustTargetRpm(5));
         
-        // Timer Buttons (New in V0.7)
         safeBind('btnTimeMinus', () => adjustTime(-5));
         safeBind('btnTimePlus', () => adjustTime(5));
         safeBind('btnPause', togglePause);
@@ -284,12 +330,12 @@
 
         loadSettings();
         updateFanConfig();
-        updateTimerDisplay(); // Init Display
+        updateTimerDisplay();
 
         if(syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(bleSyncLoop, 250);
         
-        rawLog("System Ready (Timer Added).");
+        rawLog("System Ready (V0.9).");
     }
 
     function safeBind(id, fn) {
@@ -381,11 +427,8 @@
         sendHexDirect(0x07); 
         currentStatus = 'RUNNING';
         updatePauseBtn();
-        
-        // Start Interval
         if(workoutInterval) clearInterval(workoutInterval);
         workoutInterval = setInterval(timerLoop, 1000);
-        
         rawLog("Workout Started.");
     }
 
@@ -404,15 +447,11 @@
     }
 
     function restartWorkout() {
-        // Reset Logic
-        workoutSeconds = 0; // Elapsed Reset
-        remainingSeconds = targetDurationMins * 60; // Countdown Reset
-        
-        // Ensure Running
+        workoutSeconds = 0; 
+        remainingSeconds = targetDurationMins * 60; 
         currentStatus = 'RUNNING';
         if(workoutInterval) clearInterval(workoutInterval);
         workoutInterval = setInterval(timerLoop, 1000);
-        
         updatePauseBtn();
         updateTimerDisplay();
         rawLog("Restarted.");
@@ -420,16 +459,9 @@
 
     function timerLoop() {
         if(currentStatus !== 'RUNNING') return;
-
         workoutSeconds++;
-        
-        if(remainingSeconds > 0) {
-            remainingSeconds--;
-        } else {
-            // Timer Finished logic? For now just stay at 0
-            remainingSeconds = 0;
-        }
-        
+        if(remainingSeconds > 0) remainingSeconds--;
+        else remainingSeconds = 0;
         updateTimerDisplay();
     }
 
@@ -437,19 +469,14 @@
         targetDurationMins += delta;
         if(targetDurationMins < 5) targetDurationMins = 5;
         if(targetDurationMins > 180) targetDurationMins = 180;
-        
-        // Update remaining time based on change
         remainingSeconds += (delta * 60);
         if(remainingSeconds < 0) remainingSeconds = 0;
-        
         updateTimerDisplay();
-        rawLog(`Target Time: ${targetDurationMins}m`);
     }
 
     function updateTimerDisplay() {
         ui.globalTimer.innerText = fmt(remainingSeconds);
         ui.elapsedLabel.innerText = "Elapsed: " + fmt(workoutSeconds);
-        
         if(remainingSeconds === 0) ui.globalTimer.style.color = "#ef4444";
         else ui.globalTimer.style.color = "#f8fafc";
     }
@@ -474,6 +501,12 @@
         isFanMode = e.target.checked;
         updateFanConfig();
     }
+
+    // V0.9 New Toggle Logic
+    function toggleToast(e) {
+        isToastEnabled = e.target.checked;
+        localStorage.setItem('fan_toast', isToastEnabled);
+    }
     
     function adjustTargetRpm(delta) {
         let el = document.getElementById('cfgTargetRpm');
@@ -489,8 +522,16 @@
         try {
             const sMax = localStorage.getItem('fan_max');
             const sTarget = localStorage.getItem('fan_target_rpm');
+            // V0.9 Load Toast Setting
+            const sToast = localStorage.getItem('fan_toast');
+
             if(sMax) document.getElementById('cfgMaxLevel').value = sMax;
             if(sTarget) document.getElementById('cfgTargetRpm').value = sTarget;
+            
+            if(sToast !== null) {
+                isToastEnabled = (sToast === 'true');
+                document.getElementById('toastToggle').checked = isToastEnabled;
+            }
         } catch(e) {}
     }
 
@@ -505,6 +546,26 @@
         if(isFanMode && currentRpm > 0) calcFanResistance(currentRpm);
     }
     
+    // TOAST FUNCTION
+    function showLevelToast(level, isUp) {
+        if(!ui.toast) return;
+        // V0.9 Check switch
+        if(!isToastEnabled) return;
+        
+        ui.tVal.innerText = level;
+        ui.tLbl.innerText = isUp ? "LEVEL ▲" : "LEVEL ▼";
+        ui.tVal.className = "toast-val " + (isUp ? "t-up" : "t-down");
+        ui.tLbl.className = "toast-lbl " + (isUp ? "t-up" : "t-down");
+        ui.toast.style.borderColor = isUp ? "#facc15" : "#4ade80";
+
+        ui.toast.classList.add('show');
+        
+        if(toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+            ui.toast.classList.remove('show');
+        }, 2000);
+    }
+
     function calcFanResistance(rpm) {
         if (rpm >= 10) {
             lastActiveTime = Date.now(); 
@@ -517,14 +578,20 @@
             let threshold = fanConfig.max * 0.10; 
 
             if(diff > threshold) {
+                const isUp = newLevel > targetResistance;
                 targetResistance = newLevel;
                 if(ui.res) ui.res.innerText = targetResistance;
+                
+                showLevelToast(newLevel, isUp);
+                rawLog(`Fan: ${rpm}rpm -> Lv${newLevel}`);
             }
         } else {
             if (Date.now() - lastActiveTime > 4000) {
                 if(targetResistance !== 1) {
                     targetResistance = 1;
                     if(ui.res) ui.res.innerText = 1;
+                    showLevelToast(1, false); 
+                    rawLog("Fan: Stopped -> Lv1");
                 }
             }
         }
@@ -548,13 +615,18 @@
         }
         if(f&8) off+=2;
         if(f&16) off+=3;
+        
         if(f&32) {
             const realLevel = v.getInt16(off, true);
-            if (Date.now() - lastCmdTime > 3000) {
-                if(ui.res && realLevel > 0) ui.res.innerText = realLevel;
+            // Fix: Strictly ignore <= 0
+            if (realLevel > 0) {
+                if (Date.now() - lastCmdTime > 3000) {
+                    if(ui.res) ui.res.innerText = realLevel;
+                }
             }
             off+=2; 
         }
+        
         if(f&64) document.getElementById('pwrVal').innerText = v.getInt16(off,true);
     }
 
