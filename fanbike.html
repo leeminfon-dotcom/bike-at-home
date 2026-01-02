@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fanbike V0.53</title>
+    <title>Fanbike V0.6</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -100,7 +100,6 @@
         }
         .btn-connect { background: var(--primary); }
         
-        /* Req 2: Shrink Global Timer Size (80px -> 40px) */
         .global-timer { font-size: 40px; font-weight: bold; margin-bottom: 5px; }
 
         /* Switch & Slider Styles */
@@ -134,12 +133,12 @@
 </head>
 <body>
 
-<div id="debug-console">V0.53 Init...</div>
+<div id="debug-console">V0.6 Init...</div>
 
 <div class="app-container">
     <div class="content">
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="font-weight:bold; font-size:20px;">Fanbike V0.53</div>
+            <div style="font-weight:bold; font-size:20px;">Fanbike V0.6</div>
             <div id="btStatus" style="color:#666; font-size:14px;">Disconnected</div>
         </div>
 
@@ -168,22 +167,23 @@
                 </label>
             </div>
         
-            <div style="display:grid; grid-template-columns: 1fr 1.2fr; gap:15px; align-items: end;">
+            <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:15px; align-items: end;">
                 <div>
                     <div style="font-size:12px; color:#94a3b8; margin-bottom:5px;">Max Level</div>
                     <input type="number" id="cfgMaxLevel" value="32" style="width:100%; background:#334155; border:none; color:white; padding:10px; border-radius:8px; text-align:center; box-sizing:border-box;">
                 </div>
                 <div>
-                    <div style="font-size:12px; color:#94a3b8; margin-bottom:5px;">Level @ 50RPM</div>
+                    <div style="font-size:12px; color:#94a3b8; margin-bottom:5px;">Target RPM for Max</div>
                     <div class="stepper">
-                        <button id="btnBaseMinus">-</button>
-                        <input type="number" id="cfgBaseLevel" value="10" readonly>
-                        <button id="btnBasePlus">+</button>
+                        <button id="btnTargetMinus">-</button>
+                        <input type="number" id="cfgTargetRpm" value="90" readonly>
+                        <button id="btnTargetPlus">+</button>
                     </div>
                 </div>
             </div>
             <div style="font-size:11px; color:#666; margin-top:15px; text-align:center;">
-                Threshold: Change only if diff > 10% of Max
+                Reach Max Level at Target RPM<br>
+                (Threshold: 10% of Max)
             </div>
         </div>
 
@@ -209,8 +209,8 @@
 
     let isFanMode = true;
     let currentRpm = 0;
-    // Req 4: Default base changed to 10
-    let fanConfig = { max: 32, base: 10 }; 
+    // V0.6 Config: Target RPM logic
+    let fanConfig = { max: 32, targetRpm: 90 }; 
     
     let lastActiveTime = Date.now();
     let ui = {};
@@ -235,19 +235,18 @@
         
         safeBind('fanModeToggle', toggleFanMode);
         document.getElementById('cfgMaxLevel').addEventListener('input', updateFanConfig);
-        safeBind('btnBaseMinus', () => adjustBaseLevel(-1));
-        safeBind('btnBasePlus', () => adjustBaseLevel(1));
         
-        // Req 3: Load Settings from Local Storage on Init
+        // V0.6 Button Logic (+/- 5 RPM)
+        safeBind('btnTargetMinus', () => adjustTargetRpm(-5));
+        safeBind('btnTargetPlus', () => adjustTargetRpm(5));
+        
         loadSettings();
-        
-        // Apply Config
         updateFanConfig();
 
         if(syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(bleSyncLoop, 250);
         
-        rawLog("System Ready (V0.53).");
+        rawLog("System Ready (V0.6 RPM Target).");
     }
 
     function safeBind(id, fn) {
@@ -385,64 +384,54 @@
         updateFanConfig();
     }
     
-function adjustBaseLevel(delta) {
-    // 取得當前的 Max Level 設定值
-    const maxEl = document.getElementById('cfgMaxLevel');
-    const currentMax = parseInt(maxEl.value) || 32;
+    // V0.6 Adjustment Logic
+    function adjustTargetRpm(delta) {
+        let el = document.getElementById('cfgTargetRpm');
+        let val = parseInt(el.value) || 90;
+        
+        val += delta;
+        
+        if(val < 40) val = 40; // Logical minimum
+        if(val > 200) val = 200; // Logical maximum
+        
+        el.value = val;
+        updateFanConfig();
+    }
 
-    let el = document.getElementById('cfgBaseLevel');
-    let val = parseInt(el.value) || 10;
-    
-    val += delta;
-    
-    if(val < 1) val = 1;
-    if(val > currentMax) val = currentMax; // 使用動態上限
-    
-    el.value = val;
-    updateFanConfig();
-}
-
-    // Req 3: Local Storage Logic
+    // V0.6 Storage Keys
     function loadSettings() {
         try {
             const sMax = localStorage.getItem('fan_max');
-            const sBase = localStorage.getItem('fan_base');
+            const sTarget = localStorage.getItem('fan_target_rpm');
             
             if(sMax) document.getElementById('cfgMaxLevel').value = sMax;
-            if(sBase) document.getElementById('cfgBaseLevel').value = sBase;
-            else document.getElementById('cfgBaseLevel').value = 10; // Default if nothing saved
+            if(sTarget) document.getElementById('cfgTargetRpm').value = sTarget;
+            else document.getElementById('cfgTargetRpm').value = 90; 
         } catch(e) { console.error(e); }
     }
 
-function updateFanConfig() {
-    const max = parseInt(document.getElementById('cfgMaxLevel').value) || 32;
-    let base = parseInt(document.getElementById('cfgBaseLevel').value) || 10;
-    
-    // --- 新增：完整性檢查 (Integrity Check) ---
-    // 如果目前的 Base Level 比 Max Level 還大，強制降下來
-    if (base > max) {
-        base = max;
-        document.getElementById('cfgBaseLevel').value = base;
+    function updateFanConfig() {
+        const max = parseInt(document.getElementById('cfgMaxLevel').value) || 32;
+        const targetRpm = parseInt(document.getElementById('cfgTargetRpm').value) || 90;
+        
+        try {
+            localStorage.setItem('fan_max', max);
+            localStorage.setItem('fan_target_rpm', targetRpm);
+        } catch(e) {}
+
+        fanConfig = { max, targetRpm };
+        if(isFanMode && currentRpm > 0) calcFanResistance(currentRpm);
     }
-    // ---------------------------------------
-
-    // Save to Storage
-    try {
-        localStorage.setItem('fan_max', max);
-        localStorage.setItem('fan_base', base);
-    } catch(e) {}
-
-    fanConfig = { max, base };
-    if(isFanMode && currentRpm > 0) calcFanResistance(currentRpm);
-}
     
+    // V0.6 Calculation Formula
     function calcFanResistance(rpm) {
-        // 1. Valid Pedaling (RPM >= 10)
+        // 1. Valid Pedaling
         if (rpm >= 10) {
             lastActiveTime = Date.now(); 
             
-            let ratio = rpm / 50;
-            let newLevel = Math.round(fanConfig.base * (ratio * ratio));
+            // Formula: Max * (CurrentRPM / TargetRPM)^2
+            let ratio = rpm / fanConfig.targetRpm;
+            let newLevel = Math.round(fanConfig.max * Math.pow(ratio, 2));
             
             if(newLevel < 1) newLevel = 1;
             if(newLevel > fanConfig.max) newLevel = fanConfig.max;
@@ -456,7 +445,7 @@ function updateFanConfig() {
                 rawLog(`Fan: ${rpm}rpm -> Lv${newLevel}`); 
             }
         } 
-        // 2. Glitch / Stop (RPM < 10)
+        // 2. Stop Logic (4s Debounce)
         else {
             if (Date.now() - lastActiveTime > 4000) {
                 if(targetResistance !== 1) {
@@ -496,7 +485,6 @@ function updateFanConfig() {
         
         if(f&32) {
             const realLevel = v.getInt16(off, true);
-            // Req 1: Fix flickering. Only update if realLevel > 0 (filter out 0-glitches)
             if (Date.now() - lastCmdTime > 3000) {
                 if(ui.res && realLevel > 0) ui.res.innerText = realLevel;
             }
