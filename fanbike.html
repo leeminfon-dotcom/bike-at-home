@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fanbike V0.2</title>
+    <title>Fanbike V0.3</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -131,16 +131,24 @@
         .controls-row { display: flex; gap: 10px; }
         .control-group { background: rgba(0,0,0,0.2); padding: 5px; border-radius: 8px; flex: 1; display: flex; justify-content: space-between; align-items: center; }
         .ctrl-btn { width: 30px; height: 30px; border-radius: 50%; border: none; background: #475569; color: white; }
+
+		/* --- Patch: Switch & Slider Styles --- */
+        .switch { position: relative; display: inline-block; width: 40px; height: 24px; margin-right: 10px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #475569; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #06b6d4; }
+        input:checked + .slider:before { transform: translateX(16px); }
     </style>
 </head>
 <body>
 
-<div id="debug-console">V0.1 Init...</div>
+<div id="debug-console">V0.3 Init...</div>
 
 <div class="app-container">
     <div class="content">
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="font-weight:bold; font-size:20px;">Fanbike V0.2</div>
+            <div style="font-weight:bold; font-size:20px;">Fanbike V0.3</div>
             <div id="btStatus" style="color:#666; font-size:14px;">Disconnected</div>
         </div>
 
@@ -170,6 +178,29 @@
                 <button id="mainResPlus" class="ctrl-btn" style="width: 60px; height: 60px; font-size: 24px;">+</button>
             </div>
         </div>
+		<div style="background: #1e293b; padding: 20px; border-radius: 20px; width: 100%; border: 1px solid #475569; margin-top: 20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <span style="color:#06b6d4; font-weight:bold;">FAN BIKE MODE</span>
+        <label class="switch">
+            <input type="checkbox" id="fanModeToggle">
+            <span class="slider"></span>
+        </label>
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+        <div>
+            <div style="font-size:12px; color:#94a3b8; margin-bottom:5px;">Max Level</div>
+            <input type="number" id="cfgMaxLevel" value="32" style="width:100%; background:#334155; border:none; color:white; padding:10px; border-radius:8px; text-align:center; box-sizing:border-box;">
+        </div>
+        <div>
+            <div style="font-size:12px; color:#94a3b8; margin-bottom:5px;">Level @ 50RPM</div>
+            <input type="number" id="cfgBaseLevel" value="4" style="width:100%; background:#334155; border:none; color:white; padding:10px; border-radius:8px; text-align:center; box-sizing:border-box;">
+        </div>
+    </div>
+    <div style="font-size:11px; color:#666; margin-top:10px; text-align:center;">
+        Resistance adjusts automatically based on RPM²
+    </div>
+</div>
     </div>
 </div>
 
@@ -191,6 +222,10 @@
     let workoutInterval;
     let workoutSeconds = 0; // 新增：單純記錄運動秒數
 
+	// --- Patch: Fan Mode Vars ---
+    let isFanMode = false;
+    let currentRpm = 0;
+    let fanConfig = { max: 32, base: 4 };
     let ui = {};
 
     // --- 2. STARTUP ---
@@ -219,7 +254,10 @@
         safeBind('mainResMinus', () => manualAdjRes(-1));
         safeBind('mainResPlus', () => manualAdjRes(1));
 
-        // 移除：所有 Phase 相關的 safeBind 和 loadSettings()
+        // --- Patch: Fan Mode Bindings ---
+        safeBind('fanModeToggle', toggleFanMode);
+        document.getElementById('cfgMaxLevel').addEventListener('change', updateFanConfig);
+        document.getElementById('cfgBaseLevel').addEventListener('change', updateFanConfig);
         
         // Start Sync Loop
         if(syncInterval) clearInterval(syncInterval);
@@ -424,14 +462,51 @@
         let m=Math.floor(s/60), sec=s%60;
         return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
     }
-    
-    // 修正：刪除原本下面那個重複且錯誤的 timerLoop
-    // 只保留這個簡單版本
-    function timerLoop() {
-        workoutSeconds++;
-        ui.globalTimer.innerText = fmt(workoutSeconds);
-    }
-    
+
+	// --- Patch: Fan Mode Logic ---
+	function toggleFanMode(e) {
+	    isFanMode = e.target.checked;
+	    // 視覺反饋：鎖定手動按鈕
+	    const disabled = isFanMode;
+	    document.getElementById('mainResMinus').disabled = disabled;
+	    document.getElementById('mainResPlus').disabled = disabled;
+	    
+	    if(disabled) {
+	        document.getElementById('mainResMinus').style.opacity = 0.3;
+	        document.getElementById('mainResPlus').style.opacity = 0.3;
+	    } else {
+	        document.getElementById('mainResMinus').style.opacity = 1;
+	        document.getElementById('mainResPlus').style.opacity = 1;
+	    }
+	    
+	    rawLog(isFanMode ? "Fan Mode: ON" : "Fan Mode: OFF");
+	    updateFanConfig();
+	}
+	
+	function updateFanConfig() {
+	    const max = parseInt(document.getElementById('cfgMaxLevel').value) || 32;
+	    const base = parseInt(document.getElementById('cfgBaseLevel').value) || 4;
+	    fanConfig = { max, base };
+	    if(isFanMode && currentRpm > 0) calcFanResistance(currentRpm);
+	}
+	
+	function calcFanResistance(rpm) {
+	    if(rpm < 10) return; // 低轉速忽略
+	    
+	    // 公式: (RPM / 50)^2 * Base
+	    let ratio = rpm / 50;
+	    let newLevel = Math.round(fanConfig.base * (ratio * ratio));
+	    
+	    if(newLevel < 1) newLevel = 1;
+	    if(newLevel > fanConfig.max) newLevel = fanConfig.max;
+	    
+	    if(newLevel !== targetResistance) {
+	        targetResistance = newLevel;
+	        refreshUI();
+	        rawLog(`Fan: ${rpm}rpm -> Lv${newLevel}`);
+	    }
+	}
+	
     // 修正：刪除原本下面那個重複的 parseData (雖然沒錯，但不需要兩個)
     // 這裡只需要保留一個 parseData 即可 (原版上面的那個是對的)
     function parseData(e) {
@@ -448,10 +523,18 @@
         if(f&2) off+=2;
         
         // 3. Cadence/RPM (Bit 2)
-        if(f&4) { 
-            document.getElementById('rpmVal').innerText = Math.floor(v.getUint16(off,true)*0.5); 
+       if(f&4) { 
+            const rawRpm = v.getUint16(off,true);
+            currentRpm = Math.floor(rawRpm * 0.5); // 0.5 resolution
+            document.getElementById('rpmVal').innerText = currentRpm;
+            
+            // --- Patch: Trigger Fan Mode ---
+            if(isFanMode) {
+                calcFanResistance(currentRpm);
+            }
             off+=2; 
         }
+		
         // 4. Average Cadence (Bit 3) - Skip
         if(f&8) off+=2;
         // 5. Total Distance (Bit 4) - Skip (3 bytes)
@@ -478,32 +561,6 @@
         }
     }
 
-    function refreshUI() {
-        let totalPlanMins = 0;
-        let totalRemainingSecs = 0;
-
-        for(let k in phases) {
-            // 更新個別卡片
-            document.getElementById(`val_res_${k}`).innerText = phases[k].res;
-            document.getElementById(`val_time_${k}`).innerText = phases[k].mins;
-            document.getElementById(`timer_${k}`).innerText = fmt(phases[k].remainingSecs);
-            
-            // 累加總數
-            totalPlanMins += phases[k].mins;
-            totalRemainingSecs += phases[k].remainingSecs;
-        }
-        
-        // 1. 大數字顯示：總剩餘秒數 (倒數)
-        if(ui.globalTimer) ui.globalTimer.innerText = fmt(totalRemainingSecs);
-        
-        // 2. 小標題顯示：總計畫分鐘數 (固定)
-        if(ui.totalLabel) ui.totalLabel.innerText = "Plan: " + totalPlanMins + " Mins";
-
-        // 3. 確保儀表板 Level 與目標一致 (如果正在運動中)
-        if(currentStatus !== 'IDLE' && ui.res) {
-            ui.res.innerText = targetResistance;
-        }
-    }
     
     function fmt(s) {
         let m=Math.floor(s/60), sec=s%60;
@@ -527,4 +584,5 @@
 </body>
 
 </html>
+
 
