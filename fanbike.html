@@ -53,20 +53,27 @@
         /* FIX: Increased padding to 250px to show Cool Down */
        /* 修改 Layout 區塊 */
 		
+/* 修改 Layout 區塊 - 修正捲動問題 */
 .app-container { 
     display: flex; 
-    flex-direction: column; /* 改為垂直排列 */
+    flex-direction: column; 
     width: 100%; 
-    height: 100%; 
+    height: 100vh; /* 強制使用視窗高度 */
     background: var(--bg);
+    overflow: hidden; /* 禁止外層捲動 */
 }
 
-/* 移除 .sidebar 樣式，修改 .content 填滿 */
 .content {
+    flex: 1; /* 關鍵：自動填滿剩餘垂直空間 */
+    overflow-y: auto; /* 關鍵：允許內部垂直捲動 */
+    -webkit-overflow-scrolling: touch; /* 讓 iOS 捲動更滑順 */
+    
     width: 100%;
-    max-width: 600px; /* 限制最大寬度，在大螢幕比較好看 */
-    margin: 0 auto;   /* 置中 */
+    max-width: 600px;
+    margin: 0 auto;
     padding: 20px;
+    padding-bottom: 200px; /* 加大底部留白，避開 Debug Console */
+    
     display: flex; 
     flex-direction: column; 
     align-items: center;
@@ -170,14 +177,6 @@
         <div id="globalTimer" class="global-timer" style="font-size: 80px;">00:00</div>
         <div style="color:#666; margin-bottom:40px;">Elapsed Time</div>
 
-        <div style="background: var(--surface); padding: 30px; border-radius: 20px; width: 100%; text-align: center;">
-            <div style="color: var(--text-muted); margin-bottom: 15px;">MANUAL RESISTANCE</div>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <button id="mainResMinus" class="ctrl-btn" style="width: 60px; height: 60px; font-size: 24px;">-</button>
-                <span id="mainResVal" style="font-size: 60px; font-weight: 800; color: var(--c-res);">1</span>
-                <button id="mainResPlus" class="ctrl-btn" style="width: 60px; height: 60px; font-size: 24px;">+</button>
-            </div>
-        </div>
 		<div style="background: #1e293b; padding: 20px; border-radius: 20px; width: 100%; border: 1px solid #475569; margin-top: 20px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
         <span style="color:#06b6d4; font-weight:bold;">FAN BIKE MODE</span>
@@ -463,20 +462,20 @@
         return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
     }
 
-	// --- Patch: Fan Mode Logic ---
+	// --- Patch: Safely toggle Fan Mode (UI removed) ---
 	function toggleFanMode(e) {
 	    isFanMode = e.target.checked;
-	    // 視覺反饋：鎖定手動按鈕
-	    const disabled = isFanMode;
-	    document.getElementById('mainResMinus').disabled = disabled;
-	    document.getElementById('mainResPlus').disabled = disabled;
 	    
-	    if(disabled) {
-	        document.getElementById('mainResMinus').style.opacity = 0.3;
-	        document.getElementById('mainResPlus').style.opacity = 0.3;
-	    } else {
-	        document.getElementById('mainResMinus').style.opacity = 1;
-	        document.getElementById('mainResPlus').style.opacity = 1;
+	    // 檢查按鈕是否存在才執行 (避免報錯)
+	    const btnMinus = document.getElementById('mainResMinus');
+	    const btnPlus = document.getElementById('mainResPlus');
+	    
+	    if (btnMinus && btnPlus) {
+	        btnMinus.disabled = isFanMode;
+	        btnPlus.disabled = isFanMode;
+	        const opacity = isFanMode ? 0.3 : 1;
+	        btnMinus.style.opacity = opacity;
+	        btnPlus.style.opacity = opacity;
 	    }
 	    
 	    rawLog(isFanMode ? "Fan Mode: ON" : "Fan Mode: OFF");
@@ -584,5 +583,6 @@
 </body>
 
 </html>
+
 
 
