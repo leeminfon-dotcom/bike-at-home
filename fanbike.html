@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fanbike v0.51</title>
+    <title>Fanbike V0.52 Fix</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -110,7 +110,7 @@
         input:checked + .slider { background-color: #06b6d4; }
         input:checked + .slider:before { transform: translateX(16px); }
 
-        /* New Stepper Styles for v0.51 */
+        /* Stepper Styles */
         .stepper {
             display: flex;
             align-items: center;
@@ -126,20 +126,19 @@
         .stepper input {
             flex: 1; background: transparent; border: none; color: white;
             text-align: center; font-size: 16px; font-weight: bold;
-            width: 50px; /* fixed width for stability */
+            width: 50px; 
         }
-        /* Remove arrows from number input */
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
 </head>
 <body>
 
-<div id="debug-console">v0.51 Init...</div>
+<div id="debug-console">V0.52 Fix Init...</div>
 
 <div class="app-container">
     <div class="content">
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="font-weight:bold; font-size:20px;">Fanbike v0.51</div>
+            <div style="font-weight:bold; font-size:20px;">Fanbike V0.52</div>
             <div id="btStatus" style="color:#666; font-size:14px;">Disconnected</div>
         </div>
 
@@ -211,9 +210,8 @@
     let currentRpm = 0;
     let fanConfig = { max: 32, base: 4 };
     
-    // --- Patch: Add Debounce Variable ---
-    let lastActiveTime = Date.now(); // 記錄最後一次有效踩踏的時間
-    
+    // Patch: Add Last Active Time for debounce
+    let lastActiveTime = Date.now();
     let ui = {};
 
     // --- 2. STARTUP ---
@@ -237,19 +235,15 @@
         // Fan Mode Bindings
         safeBind('fanModeToggle', toggleFanMode);
         document.getElementById('cfgMaxLevel').addEventListener('input', updateFanConfig);
-        
-        // Req 1: New Button Bindings
         safeBind('btnBaseMinus', () => adjustBaseLevel(-1));
         safeBind('btnBasePlus', () => adjustBaseLevel(1));
         
-        // Initial Config
         updateFanConfig();
 
-        // Start Sync Loop
         if(syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(bleSyncLoop, 250);
         
-        rawLog("System Ready (Threshold Mode).");
+        rawLog("System Ready (Fix Applied).");
     }
 
     function safeBind(id, fn) {
@@ -304,7 +298,6 @@
     async function bleSyncLoop() {
         if(!controlChar) return;
 
-        // Watchdog
         if(isWriting && (Date.now() - lastWriteTime > 1000)) {
             rawLog("Watchdog: Resetting isWriting lock", 'err');
             isWriting = false;
@@ -382,14 +375,12 @@
         return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
     }
 
-    // --- Fan Mode Logic ---
     function toggleFanMode(e) {
         isFanMode = e.target.checked;
         rawLog(isFanMode ? "Fan Mode: ON" : "Fan Mode: OFF");
         updateFanConfig();
     }
     
-    // Req 1: Adjust Base Level with Buttons
     function adjustBaseLevel(delta) {
         let el = document.getElementById('cfgBaseLevel');
         let val = parseInt(el.value) || 4;
@@ -407,10 +398,11 @@
         if(isFanMode && currentRpm > 0) calcFanResistance(currentRpm);
     }
     
+    // --- Patch: Improved Logic with 4s Debounce ---
     function calcFanResistance(rpm) {
-        // 1. 有效踩踏判定 (RPM >= 10)
+        // 1. Valid Pedaling (RPM >= 10)
         if (rpm >= 10) {
-            lastActiveTime = Date.now(); // 更新最後活動時間
+            lastActiveTime = Date.now(); // Update timestamp
             
             let ratio = rpm / 50;
             let newLevel = Math.round(fanConfig.base * (ratio * ratio));
@@ -418,9 +410,9 @@
             if(newLevel < 1) newLevel = 1;
             if(newLevel > fanConfig.max) newLevel = fanConfig.max;
             
-            // 門檻判斷 (Threshold Logic)
+            // Threshold Check
             let diff = Math.abs(newLevel - targetResistance);
-            let threshold = fanConfig.max * 0.10; // 10% 門檻
+            let threshold = fanConfig.max * 0.10; 
 
             if(diff > threshold) {
                 targetResistance = newLevel;
@@ -428,18 +420,17 @@
                 rawLog(`Fan: ${rpm}rpm -> Lv${newLevel} (Diff:${diff} > ${threshold.toFixed(1)})`); 
             }
         } 
-        // 2. 低轉速/停車判定 (RPM < 10)
+        // 2. Glitch / Stop (RPM < 10)
         else {
-            // 檢查：如果距離上次有效踩踏已經超過 2000 毫秒 (2秒)
-            if (Date.now() - lastActiveTime > 2000) {
-                // 真的停下來了，重置阻力
+            // Only drop resistance if NO valid RPM seen for > 4000ms (4 seconds)
+            if (Date.now() - lastActiveTime > 4000) {
                 if(targetResistance !== 1) {
                     targetResistance = 1;
                     if(ui.res) ui.res.innerText = 1;
-                    rawLog("Fan: Stopped (Timeout) -> Lv1");
+                    rawLog("Fan: Stopped (Timeout 4s) -> Lv1");
                 }
             }
-            // 如果還沒超過 2秒，忽略這個 0 RPM 訊號，保持當前阻力
+            // If < 4s, do nothing (ignore the 0 RPM glitch)
         }
     }
     
@@ -488,4 +479,3 @@
 </script>
 </body>
 </html>
-
