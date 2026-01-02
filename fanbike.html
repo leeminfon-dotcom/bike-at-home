@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fanbike V0.5</title>
+    <title>Fanbike v0.51</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -110,7 +110,7 @@
         input:checked + .slider { background-color: #06b6d4; }
         input:checked + .slider:before { transform: translateX(16px); }
 
-        /* New Stepper Styles for V0.5 */
+        /* New Stepper Styles for v0.51 */
         .stepper {
             display: flex;
             align-items: center;
@@ -134,12 +134,12 @@
 </head>
 <body>
 
-<div id="debug-console">V0.5 Init...</div>
+<div id="debug-console">v0.51 Init...</div>
 
 <div class="app-container">
     <div class="content">
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="font-weight:bold; font-size:20px;">Fanbike V0.5</div>
+            <div style="font-weight:bold; font-size:20px;">Fanbike v0.51</div>
             <div id="btStatus" style="color:#666; font-size:14px;">Disconnected</div>
         </div>
 
@@ -210,6 +210,10 @@
     let isFanMode = true;
     let currentRpm = 0;
     let fanConfig = { max: 32, base: 4 };
+    
+    // --- Patch: Add Debounce Variable ---
+    let lastActiveTime = Date.now(); // 記錄最後一次有效踩踏的時間
+    
     let ui = {};
 
     // --- 2. STARTUP ---
@@ -404,34 +408,38 @@
     }
     
     function calcFanResistance(rpm) {
-        // Stop condition: Always force level 1 if stopped, ignoring threshold
-        if(rpm < 10) {
-            if(targetResistance !== 1) {
-                targetResistance = 1;
-                if(ui.res) ui.res.innerText = 1;
-                rawLog("Fan: Stopped -> Lv1");
-            }
-            return;
-        } 
-        
-        let ratio = rpm / 50;
-        let newLevel = Math.round(fanConfig.base * (ratio * ratio));
-        
-        if(newLevel < 1) newLevel = 1;
-        if(newLevel > fanConfig.max) newLevel = fanConfig.max;
-        
-        // Req 2: Threshold Logic
-        // Calculate the difference magnitude
-        let diff = Math.abs(newLevel - targetResistance);
-        
-        // Calculate Threshold: 10% of TOTAL level (Max Level)
-        // e.g., if Max=32, Threshold=3.2. Change only happens if diff > 3.2
-        let threshold = fanConfig.max * 0.10;
+        // 1. 有效踩踏判定 (RPM >= 10)
+        if (rpm >= 10) {
+            lastActiveTime = Date.now(); // 更新最後活動時間
+            
+            let ratio = rpm / 50;
+            let newLevel = Math.round(fanConfig.base * (ratio * ratio));
+            
+            if(newLevel < 1) newLevel = 1;
+            if(newLevel > fanConfig.max) newLevel = fanConfig.max;
+            
+            // 門檻判斷 (Threshold Logic)
+            let diff = Math.abs(newLevel - targetResistance);
+            let threshold = fanConfig.max * 0.10; // 10% 門檻
 
-        if(diff > threshold) {
-            targetResistance = newLevel;
-            if(ui.res) ui.res.innerText = targetResistance;
-            rawLog(`Fan: ${rpm}rpm -> Lv${newLevel} (Diff:${diff} > ${threshold.toFixed(1)})`); 
+            if(diff > threshold) {
+                targetResistance = newLevel;
+                if(ui.res) ui.res.innerText = targetResistance;
+                rawLog(`Fan: ${rpm}rpm -> Lv${newLevel} (Diff:${diff} > ${threshold.toFixed(1)})`); 
+            }
+        } 
+        // 2. 低轉速/停車判定 (RPM < 10)
+        else {
+            // 檢查：如果距離上次有效踩踏已經超過 2000 毫秒 (2秒)
+            if (Date.now() - lastActiveTime > 2000) {
+                // 真的停下來了，重置阻力
+                if(targetResistance !== 1) {
+                    targetResistance = 1;
+                    if(ui.res) ui.res.innerText = 1;
+                    rawLog("Fan: Stopped (Timeout) -> Lv1");
+                }
+            }
+            // 如果還沒超過 2秒，忽略這個 0 RPM 訊號，保持當前阻力
         }
     }
     
@@ -480,3 +488,4 @@
 </script>
 </body>
 </html>
+
