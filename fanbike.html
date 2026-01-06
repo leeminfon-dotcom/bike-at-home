@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fanbike V0.98 (Fix)</title>
+    <title>Fanbike V1.0</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -109,7 +109,7 @@
 </head>
 <body>
 
-<div id="debug-console">V0.98 Init...</div>
+<div id="debug-console">V1.0 Ready.</div>
 
 <div id="toast-box">
     <div id="t-lbl" class="toast-lbl">LEVEL</div>
@@ -119,7 +119,7 @@
 <div class="app-container">
     <div class="content">
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="font-weight:bold; font-size:20px;">Fanbike V0.98</div>
+            <div style="font-weight:bold; font-size:20px;">Fanbike V1.0</div>
             <div id="btStatus" style="color:#666; font-size:14px;">Disconnected</div>
         </div>
 
@@ -180,7 +180,7 @@
                 </div>
             </div>
             <div style="font-size:11px; color:#666; margin-top:15px; text-align:center;">
-                Fixed: Threshold Logic Deadlock
+                Smart Momentum | 5% Threshold | Auto-Stop
             </div>
         </div>
     </div>
@@ -191,6 +191,7 @@
     const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
     const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
 
+    let connectedDevice = null;
     let controlChar = null;
     let currentStatus = 'IDLE'; 
     
@@ -214,6 +215,8 @@
     let smoothedRpm = 0; 
     
     let toastTimer = null;
+    let wakeLock = null; // Wake Lock Object
+    let audioCtx = null; // Audio Context
     let ui = {};
 
     window.onload = function() {
@@ -256,7 +259,7 @@
         if(syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(bleSyncLoop, 250);
         
-        rawLog("System Ready (V0.98).");
+        rawLog("System Ready (V1.0).");
     }
 
     function safeBind(id, fn) {
@@ -264,7 +267,67 @@
         if(el) el.addEventListener('click', fn);
     }
 
+    // --- 1. WAKE LOCK API ---
+    async function requestWakeLock() {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await navigator.wakeLock.request('screen');
+                rawLog("Screen Wake Lock: Active");
+                wakeLock.addEventListener('release', () => {
+                    rawLog("Screen Wake Lock: Released");
+                });
+            }
+        } catch (err) {
+            rawLog(`Wake Lock Error: ${err.name}, ${err.message}`, 'err');
+        }
+    }
+
+    function releaseWakeLock() {
+        if (wakeLock !== null) {
+            wakeLock.release();
+            wakeLock = null;
+        }
+    }
+
+    // --- 2. AUDIO API (BEEP) ---
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    function playFinishSound() {
+        if (!audioCtx) initAudio();
+        
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now); // A5
+        osc.frequency.setValueAtTime(880, now + 0.2);
+        osc.frequency.setValueAtTime(0, now + 0.25); // Pause
+        osc.frequency.setValueAtTime(880, now + 0.35); // Second Beep
+        
+        gain.gain.setValueAtTime(0.5, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.6);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start(now);
+        osc.stop(now + 0.7);
+        rawLog("Beep-Beep!", 'succ');
+    }
+
+    // --- 3. BLUETOOTH ---
     async function startScan() {
+        // Init Audio Context on user click (Browser Policy)
+        initAudio();
+
         if(!navigator.bluetooth) return alert("Browser not supported");
         try {
             ui.connectBtn.innerText = "Scanning...";
@@ -273,7 +336,9 @@
                 optionalServices: [FTMS_UUID]
             });
             
+            connectedDevice = dev; // Save for disconnect
             rawLog(`Device: ${dev.name} (${dev.id})`);
+            
             dev.addEventListener('gattserverdisconnected', onDisconnect);
             const server = await dev.gatt.connect();
             const svc = await server.getPrimaryService(FTMS_UUID);
@@ -291,7 +356,10 @@
             ui.btStatus.style.color = "#3b82f6";
             ui.connectBtn.style.display = 'none';
             rawLog("Connected!", 'succ');
+            
+            requestWakeLock(); // Request Screen Lock
             startWorkout();
+            
         } catch(e) {
             ui.connectBtn.innerText = "Connect";
             rawLog(`Connect Fail: ${e.message}`, 'err');
@@ -308,7 +376,7 @@
             isWriting = true;
             lastWriteTime = Date.now();
             try {
-                if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
+                // Keep UI authority (no bluetooth feedback display for level)
                 await controlChar.writeValue(new Uint8Array([0x07]));
                 await sleep(50); 
                 const buf = new ArrayBuffer(3);
@@ -331,10 +399,12 @@
         ui.btStatus.style.color = "#666";
         ui.connectBtn.style.display = 'block';
         currentStatus = 'IDLE';
+        releaseWakeLock();
         if(workoutInterval) clearInterval(workoutInterval);
         rawLog("Device Disconnected", 'err');
     }
 
+    // --- 4. TIMER & LOGIC ---
     function startWorkout() {
         sendHexDirect(0x07); 
         currentStatus = 'RUNNING';
@@ -366,20 +436,51 @@
         workoutInterval = setInterval(timerLoop, 1000);
         updatePauseBtn();
         updateTimerDisplay();
+        requestWakeLock(); // Ensure lock is active
         rawLog("Restarted.");
     }
 
     function timerLoop() {
         if(currentStatus !== 'RUNNING') return;
+        
         workoutSeconds++;
-        if(remainingSeconds > 0) remainingSeconds--;
-        else remainingSeconds = 0;
+        
+        if(remainingSeconds > 0) {
+            remainingSeconds--;
+        } else {
+            // Timer Finished Logic
+            finishWorkout();
+        }
         updateTimerDisplay();
+    }
+
+    // V1.0: Finish Routine
+    async function finishWorkout() {
+        currentStatus = 'IDLE';
+        if(workoutInterval) clearInterval(workoutInterval);
+        remainingSeconds = 0;
+        
+        playFinishSound(); // 1. Sound
+        
+        rawLog("Time's Up! Disconnecting...");
+        
+        // 2. Reset Resistance to 1
+        targetResistance = 1;
+        ui.res.innerText = 1;
+        // Wait for sync loop to send '1'
+        await sleep(500); 
+        
+        // 3. Auto Disconnect
+        if(connectedDevice && connectedDevice.gatt.connected) {
+            connectedDevice.gatt.disconnect();
+        }
+        
+        releaseWakeLock(); // 4. Release Screen
     }
 
     function adjustTime(delta) {
         targetDurationMins += delta;
-        if(targetDurationMins < 5) targetDurationMins = 5;
+        if(targetDurationMins < 1) targetDurationMins = 1;
         if(targetDurationMins > 180) targetDurationMins = 180;
         remainingSeconds += (delta * 60);
         if(remainingSeconds < 0) remainingSeconds = 0;
@@ -465,36 +566,31 @@
         toastTimer = setTimeout(() => { ui.toast.classList.remove('show'); }, 2000);
     }
 
-    // --- V0.98 FIX: LOGIC ORDER ---
     function calcFanResistance(realRpm) {
         if (realRpm >= 10) {
             lastActiveTime = Date.now(); 
             
-            // 1. Smooth RPM (Momentum)
             let alpha = (realRpm > smoothedRpm) ? 0.4 : 0.1;
             smoothedRpm = (smoothedRpm * (1 - alpha)) + (realRpm * alpha);
             
-            // 2. Calc Ideal Level
             let ratio = smoothedRpm / fanConfig.targetRpm;
             let idealLevel = Math.round(fanConfig.max * Math.pow(ratio, 2));
             
             if(idealLevel < 1) idealLevel = 1;
             if(idealLevel > fanConfig.max) idealLevel = fanConfig.max;
             
-            // 3. Check Threshold FIRST (Avoid Deadlock)
             let diff = Math.abs(idealLevel - targetResistance);
-            let threshold = fanConfig.max * 0.10; 
+            
+            // V1.0 Change: Threshold lowered to 5% (0.05)
+            let threshold = fanConfig.max * 0.05; 
 
             if(diff > threshold) {
-                // 4. Apply Step Limiter to the MOVEMENT
                 let nextLevel = idealLevel;
                 if (nextLevel > targetResistance + 2) nextLevel = targetResistance + 2;
                 if (nextLevel < targetResistance - 2) nextLevel = targetResistance - 2;
 
                 const isUp = nextLevel > targetResistance;
                 targetResistance = nextLevel;
-                
-                // UI Authority
                 if(ui.res) ui.res.innerText = targetResistance;
                 
                 showLevelToast(targetResistance, isUp);
@@ -520,7 +616,6 @@
         const f = v.getUint16(0, true);
         let off = 2;
 
-        // V0.97 FIX: IGNORE 0 IF CMD SENT RECENTLY (3000ms)
         const isCmdActive = (Date.now() - lastCmdTime < 3000);
 
         if(!(f&1)) { 
@@ -546,7 +641,6 @@
         
         if(f&32) {
             const realLevel = v.getInt16(off, true);
-            // V0.96 Logic: If Fan Mode, ignore bluetooth level feedback
             if (!isFanMode && realLevel > 0 && !isCmdActive) {
                 if(ui.res) ui.res.innerText = realLevel;
             }
