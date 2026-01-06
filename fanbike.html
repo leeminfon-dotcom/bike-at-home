@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Fanbike V1.1 (Stable)</title>
+    <title>Fanbike V1.2 (Glitch Fix)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -109,7 +109,7 @@
 </head>
 <body>
 
-<div id="debug-console">V1.1 Stable Init...</div>
+<div id="debug-console">V1.2 Init...</div>
 
 <div id="toast-box">
     <div id="t-lbl" class="toast-lbl">LEVEL</div>
@@ -119,7 +119,7 @@
 <div class="app-container">
     <div class="content">
         <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="font-weight:bold; font-size:20px;">Fanbike V1.1</div>
+            <div style="font-weight:bold; font-size:20px;">Fanbike V1.2</div>
             <div id="btStatus" style="color:#666; font-size:14px;">Disconnected</div>
         </div>
 
@@ -180,7 +180,7 @@
                 </div>
             </div>
             <div style="font-size:11px; color:#666; margin-top:15px; text-align:center;">
-                Stabilized Momentum | Anti-Jitter Logic
+                Glitch Filter Active: Ignores RPM drops for 1.5s
             </div>
         </div>
     </div>
@@ -211,10 +211,14 @@
     let currentRpm = 0;
     let fanConfig = { max: 32, targetRpm: 90 }; 
     
-    // Momentum Vars
+    // Momentum & Filter Vars
     let lastActiveTime = Date.now();
     let smoothedRpm = 0; 
-    let lastLevelChangeTime = 0; // V1.1 Hysteresis Timer
+    let lastLevelChangeTime = 0; 
+    
+    // V1.2: Glitch Filter Vars
+    let lastValidRpm = 0;
+    let lastValidRpmTime = Date.now();
     
     let toastTimer = null;
     let wakeLock = null; 
@@ -261,7 +265,7 @@
         if(syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(bleSyncLoop, 250);
         
-        rawLog("System Ready (V1.1 Stable).");
+        rawLog("System Ready (V1.2).");
     }
 
     function safeBind(id, fn) {
@@ -269,98 +273,70 @@
         if(el) el.addEventListener('click', fn);
     }
 
-    // --- 1. WAKE LOCK API ---
     async function requestWakeLock() {
         try {
             if ('wakeLock' in navigator) {
                 wakeLock = await navigator.wakeLock.request('screen');
                 rawLog("Screen Wake Lock: Active");
-                wakeLock.addEventListener('release', () => {
-                    rawLog("Screen Wake Lock: Released");
-                });
+                wakeLock.addEventListener('release', () => { rawLog("Screen Wake Lock: Released"); });
             }
-        } catch (err) {
-            rawLog(`Wake Lock Error: ${err.name}, ${err.message}`, 'err');
-        }
+        } catch (err) {}
     }
 
     function releaseWakeLock() {
-        if (wakeLock !== null) {
-            wakeLock.release();
-            wakeLock = null;
-        }
+        if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
     }
 
-    // --- 2. AUDIO API (BEEP) ---
     function initAudio() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
     }
 
     function playFinishSound() {
         if (!audioCtx) initAudio();
-        
         const now = audioCtx.currentTime;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, now); // A5
+        osc.frequency.setValueAtTime(880, now);
         osc.frequency.setValueAtTime(880, now + 0.2);
-        osc.frequency.setValueAtTime(0, now + 0.25); // Pause
-        osc.frequency.setValueAtTime(880, now + 0.35); // Second Beep
-        
+        osc.frequency.setValueAtTime(0, now + 0.25);
+        osc.frequency.setValueAtTime(880, now + 0.35);
         gain.gain.setValueAtTime(0.5, now);
         gain.gain.linearRampToValueAtTime(0, now + 0.6);
-        
         osc.connect(gain);
         gain.connect(audioCtx.destination);
-        
         osc.start(now);
         osc.stop(now + 0.7);
         rawLog("Beep-Beep!", 'succ');
     }
 
-    // --- 3. BLUETOOTH ---
     async function startScan() {
         initAudio();
-
         if(!navigator.bluetooth) return alert("Browser not supported");
         try {
             ui.connectBtn.innerText = "Scanning...";
             const dev = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true, 
-                optionalServices: [FTMS_UUID]
+                acceptAllDevices: true, optionalServices: [FTMS_UUID]
             });
-            
             connectedDevice = dev; 
             rawLog(`Device: ${dev.name} (${dev.id})`);
-            
             dev.addEventListener('gattserverdisconnected', onDisconnect);
             const server = await dev.gatt.connect();
             const svc = await server.getPrimaryService(FTMS_UUID);
             controlChar = await svc.getCharacteristic(CTRL_UUID);
             const dataChar = await svc.getCharacteristic(DATA_UUID);
-            
             await dataChar.startNotifications();
             dataChar.addEventListener('characteristicvaluechanged', parseData);
-
             rawLog("Handshake...", 'tx');
             await sendHexDirect(0x00); await sleep(100); 
             await sendHexDirect(0x07); await sleep(100);
-
             ui.btStatus.innerText = "Connected";
             ui.btStatus.style.color = "#3b82f6";
             ui.connectBtn.style.display = 'none';
             rawLog("Connected!", 'succ');
-            
             requestWakeLock(); 
             startWorkout();
-            
         } catch(e) {
             ui.connectBtn.innerText = "Connect";
             rawLog(`Connect Fail: ${e.message}`, 'err');
@@ -372,7 +348,6 @@
         if(!controlChar) return;
         if(isWriting && (Date.now() - lastWriteTime > 1000)) isWriting = false;
         if(isWriting) return;
-        
         if(targetResistance !== sentResistance) {
             isWriting = true;
             lastWriteTime = Date.now();
@@ -404,7 +379,6 @@
         rawLog("Device Disconnected", 'err');
     }
 
-    // --- 4. TIMER & LOGIC ---
     function startWorkout() {
         sendHexDirect(0x07); 
         currentStatus = 'RUNNING';
@@ -442,14 +416,9 @@
 
     function timerLoop() {
         if(currentStatus !== 'RUNNING') return;
-        
         workoutSeconds++;
-        
-        if(remainingSeconds > 0) {
-            remainingSeconds--;
-        } else {
-            finishWorkout();
-        }
+        if(remainingSeconds > 0) remainingSeconds--;
+        else finishWorkout();
         updateTimerDisplay();
     }
 
@@ -459,14 +428,10 @@
         remainingSeconds = 0;
         playFinishSound(); 
         rawLog("Time's Up! Disconnecting...");
-        
         targetResistance = 1;
         ui.res.innerText = 1;
         await sleep(500); 
-        
-        if(connectedDevice && connectedDevice.gatt.connected) {
-            connectedDevice.gatt.disconnect();
-        }
+        if(connectedDevice && connectedDevice.gatt.connected) connectedDevice.gatt.disconnect();
         releaseWakeLock(); 
     }
 
@@ -558,16 +523,32 @@
         toastTimer = setTimeout(() => { ui.toast.classList.remove('show'); }, 2000);
     }
 
-    // --- V1.1 STABILIZED MOMENTUM ---
+    // --- V1.2 FILTERED MOMENTUM ---
     function calcFanResistance(realRpm) {
-        if (realRpm >= 10) {
+        // V1.2 Glitch Filter Logic
+        let workingRpm = realRpm;
+
+        if (realRpm > 10) {
+            // Signal is valid
+            lastValidRpm = realRpm;
+            lastValidRpmTime = Date.now();
+        } else {
+            // Signal is LOW (potentially 0 glitch)
+            // If it's been less than 1.5 seconds since last GOOD signal, use the last GOOD signal.
+            if (Date.now() - lastValidRpmTime < 1500) {
+                workingRpm = lastValidRpm; 
+                // Don't update lastValidRpmTime, so time keeps ticking
+            }
+            // Else, rely on realRpm (which is low), allowing stop logic to kick in
+        }
+
+        if (workingRpm >= 10) {
             lastActiveTime = Date.now(); 
             
-            // 1. More Inertia: Reduce accel alpha (0.4 -> 0.2)
-            // If speeding up: Respond slower to avoid overshoot
-            // If slowing down: Maintain 0.1 for gliding feel
-            let alpha = (realRpm > smoothedRpm) ? 0.2 : 0.1;
-            smoothedRpm = (smoothedRpm * (1 - alpha)) + (realRpm * alpha);
+            // V1.2: Slower Accel Alpha (0.2 -> 0.15) for smoother climb
+            // Decel Alpha (0.05) for heavy flywheel feel
+            let alpha = (workingRpm > smoothedRpm) ? 0.15 : 0.05;
+            smoothedRpm = (smoothedRpm * (1 - alpha)) + (workingRpm * alpha);
             
             let ratio = smoothedRpm / fanConfig.targetRpm;
             let idealLevel = Math.round(fanConfig.max * Math.pow(ratio, 2));
@@ -575,37 +556,23 @@
             if(idealLevel < 1) idealLevel = 1;
             if(idealLevel > fanConfig.max) idealLevel = fanConfig.max;
             
-            // 2. Logic Order Fix (from V0.98)
             let diff = Math.abs(idealLevel - targetResistance);
-            
-            // 3. Adaptive Threshold
-            // Low levels (easy zone) tolerate more noise -> 7%
-            // High levels need precision -> 5%
-            let thresholdPct = (idealLevel < 10) ? 0.07 : 0.05;
-            let threshold = fanConfig.max * thresholdPct; 
+            let threshold = fanConfig.max * 0.05; 
 
             if(diff > threshold) {
-                // 4. Hysteresis Filter (New in V1.1)
-                // If change is small (<= 1 level) AND frequency is high (< 5s), IGNORE IT
                 let isSmallChange = (diff <= 1);
                 let isRapidChange = (Date.now() - lastLevelChangeTime < 5000);
-                
-                if (isSmallChange && isRapidChange) {
-                    // Skip update to prevent oscillation
-                    return;
-                }
+                if (isSmallChange && isRapidChange) return;
 
-                // Apply Step Limiter
                 let nextLevel = idealLevel;
                 if (nextLevel > targetResistance + 2) nextLevel = targetResistance + 2;
                 if (nextLevel < targetResistance - 2) nextLevel = targetResistance - 2;
 
                 const isUp = nextLevel > targetResistance;
                 targetResistance = nextLevel;
-                lastLevelChangeTime = Date.now(); // Update timer
+                lastLevelChangeTime = Date.now(); 
                 
                 if(ui.res) ui.res.innerText = targetResistance;
-                
                 showLevelToast(targetResistance, isUp);
                 rawLog(`Fan: ${realRpm}rpm (Sim:${Math.round(smoothedRpm)}) -> Lv${targetResistance}`);
             }
@@ -628,14 +595,11 @@
         const v = e.target.value;
         const f = v.getUint16(0, true);
         let off = 2;
-
         const isCmdActive = (Date.now() - lastCmdTime < 3000);
 
         if(!(f&1)) { 
             const rawSpd = (v.getUint16(off,true)*0.01).toFixed(1);
-            if(parseFloat(rawSpd) > 0 || !isCmdActive) {
-                document.getElementById('spdVal').innerText = rawSpd;
-            }
+            if(parseFloat(rawSpd) > 0 || !isCmdActive) document.getElementById('spdVal').innerText = rawSpd;
             off+=2; 
         }
         if(f&2) off+=2;
@@ -659,12 +623,9 @@
             }
             off+=2; 
         }
-        
         if(f&64) {
             const rawPwr = v.getInt16(off,true);
-            if(rawPwr > 0 || !isCmdActive) {
-                document.getElementById('pwrVal').innerText = rawPwr;
-            }
+            if(rawPwr > 0 || !isCmdActive) document.getElementById('pwrVal').innerText = rawPwr;
         }
     }
 
