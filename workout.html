@@ -3,17 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Horizon V1.3 (Mobile)</title>
+    <title>Horizon V1.4 (History + AVG RPM)</title>
     
-    <script>
-        function rawLog(msg, type='info') {
-            console.log(`[${type}] ${msg}`);
-            // 手機版 Debug Console (如有需要可開啟)
-            // const el = document.getElementById('debug-console');
-            // if(el) { el.innerText += `\n[${type}] ${msg}`; el.scrollTop = el.scrollHeight; }
-        }
-    </script>
-
     <style>
         :root {
             --bg: #0f172a; --sidebar: #1e293b; --surface: #334155;
@@ -27,19 +18,11 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: var(--bg); color: var(--text);
-            margin: 0; padding: 0;
-            /* 手機版核心修正：允許自然捲動，使用 dvh 適應網址列 */
-            min-height: 100dvh;
-            display: flex; flex-direction: column;
-            -webkit-font-smoothing: antialiased;
+            margin: 0; padding: 0; min-height: 100dvh;
+            display: flex; flex-direction: column; -webkit-font-smoothing: antialiased;
         }
 
-        /* Layout Container */
-        .app-container { 
-            display: flex; width: 100%; flex: 1; 
-            overflow: hidden; /* 預設桌面模式鎖定 */
-            height: 100vh;
-        }
+        .app-container { display: flex; width: 100%; flex: 1; overflow: hidden; height: 100vh; }
         
         .sidebar {
             width: 320px; background: var(--sidebar); padding: 20px; 
@@ -49,108 +32,51 @@
 
         .content {
             flex: 1; padding: 20px; overflow-y: auto; position: relative;
-            display: flex; flex-direction: column; align-items: center;
-            background: var(--bg);
+            display: flex; flex-direction: column; align-items: center; background: var(--bg);
         }
 
-        /* --- Mobile Optimization (關鍵修正) --- */
         @media (max-width: 820px) {
-            body { height: auto; overflow-y: auto; } /* 解除 Body 鎖定 */
-            
-            .app-container { 
-                flex-direction: column; 
-                height: auto; /* 解除容器高度鎖定 */
-                overflow: visible; 
-            }
-
-            .sidebar { 
-                width: 100%; height: auto; 
-                border-right: none; border-bottom: 1px solid #475569;
-                position: relative; overflow: visible;
-                padding-bottom: 10px;
-            }
-
-            .content { 
-                width: 100%; height: auto; overflow: visible; 
-                padding: 15px; 
-                padding-bottom: calc(80px + var(--safe-area-bottom)); /* 底部留白 */
-            }
-
-            /* 手機上圖表高度調整 */
-            .chart-box { height: 220px !important; margin-bottom: 25px !important; }
-
-            /* 放大按鈕以利觸控 */
-            .ctrl-btn { width: 44px !important; height: 44px !important; font-size: 20px !important; }
-            
-            /* 優化階段卡片間距 */
-            .phase-list { width: 100%; max-width: 100%; gap: 15px; }
+            .app-container { flex-direction: column; height: auto; overflow: visible; }
+            .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid #475569; }
+            .content { width: 100%; padding-bottom: calc(80px + var(--safe-area-bottom)); }
         }
 
-        /* UI Components */
+        /* Dash & Cards */
         .dash-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 15px; }
-        @media (max-width: 360px) { .dash-grid { grid-template-columns: repeat(2, 1fr); } } /* 小手機改兩列 */
-
         .mini-card { background: var(--surface); padding: 8px 5px; border-radius: 12px; text-align: center; }
         .mini-val { font-size: 22px; font-weight: 800; line-height: 1.2; }
         .mini-lbl { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
         .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } 
-        .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
 
         .main-btn {
             width: 100%; padding: 16px; margin-bottom: 12px; border-radius: 12px; border: none; 
             font-weight: bold; font-size: 18px; color: white; cursor: pointer;
-            transition: transform 0.1s, opacity 0.2s;
-            touch-action: manipulation; /* 優化觸控反應 */
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
         }
-        .main-btn:active { transform: scale(0.98); opacity: 0.9; }
         .btn-connect { background: var(--primary); }
         .btn-start { background: #10b981; }
         .btn-stop { background: #ef4444; }
         
-        .jump-row { display: flex; gap: 10px; margin-bottom: 10px; }
-        .btn-jump { flex: 1; background: #475569; color: white; border: none; padding: 14px; border-radius: 10px; font-size: 14px; font-weight: bold; }
+        .btn-jump { flex: 1; background: #475569; color: white; border: none; padding: 14px; border-radius: 10px; font-weight: bold; }
 
-        .chart-box {
-            width: 100%; max-width: 600px; height: 260px; 
-            background: #1e293b; border-radius: 16px; margin-bottom: 20px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            position: relative;
-        }
+        .chart-box { width: 100%; max-width: 600px; height: 260px; background: #1e293b; border-radius: 16px; margin-bottom: 20px; }
         canvas { width: 100%; height: 100%; display: block; border-radius: 16px; }
 
-        .global-timer { font-size: 56px; font-weight: 800; margin: 5px 0; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
-        
+        /* History Section */
+        .history-panel { background: rgba(0,0,0,0.2); border-radius: 12px; padding: 12px; margin-top: 20px; border: 1px solid #334155; }
+        .history-title { font-size: 11px; font-weight: 800; color: var(--text-muted); letter-spacing: 1px; margin-bottom: 8px; text-transform: uppercase; }
+        .history-item { padding: 8px 0; border-bottom: 1px solid #334155; }
+        .history-item:last-child { border: none; }
+        .history-row { display: flex; justify-content: space-between; align-items: center; }
+        .history-meta { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+        .global-timer { font-size: 56px; font-weight: 800; margin: 5px 0; font-variant-numeric: tabular-nums; }
         .phase-list { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 12px; }
-        .phase-card { 
-            background: #1e293b; padding: 15px; border-radius: 16px; 
-            border: 2px solid transparent; transition: all 0.3s; 
-        }
-        .phase-card.active { 
-            border-color: var(--primary); background: #1a273e; 
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
-        }
-        
-        .phase-header { 
-            display: flex; justify-content: space-between; margin-bottom: 12px; 
-            font-weight: 700; font-size: 16px; letter-spacing: 0.5px;
-        }
-        
+        .phase-card { background: #1e293b; padding: 15px; border-radius: 16px; border: 2px solid transparent; }
+        .phase-card.active { border-color: var(--primary); background: #1a273e; }
+        .phase-header { display: flex; justify-content: space-between; margin-bottom: 12px; font-weight: 700; }
         .controls-row { display: flex; gap: 12px; }
-        .control-group { 
-            background: rgba(0,0,0,0.3); padding: 6px; border-radius: 12px; 
-            flex: 1; display: flex; justify-content: space-between; align-items: center; 
-        }
-        .ctrl-btn { 
-            width: 36px; height: 36px; border-radius: 10px; border: none; 
-            background: #475569; color: white; font-size: 18px; 
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; touch-action: manipulation;
-        }
-        .ctrl-btn:active { background: #64748b; }
-        
-        /* Debug Console hidden by default */
-        #debug-console { display: none; }
+        .control-group { background: rgba(0,0,0,0.3); padding: 6px; border-radius: 12px; flex: 1; display: flex; justify-content: space-between; align-items: center; }
+        .ctrl-btn { width: 36px; height: 36px; border-radius: 10px; border: none; background: #475569; color: white; font-size: 18px; }
     </style>
 </head>
 <body>
@@ -158,7 +84,7 @@
 <div class="app-container">
     <div class="sidebar">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="font-weight:900; font-size:22px; letter-spacing:-0.5px; color:#fff;">HORIZON <span style="color:var(--primary); font-size:14px;">V1.3</span></div>
+            <div style="font-weight:900; font-size:22px; color:#fff;">HORIZON <span style="color:var(--primary); font-size:14px;">V1.4</span></div>
             <div id="btStatus" style="font-size:12px; font-weight:bold; color:#64748b; background:#0f172a; padding:4px 8px; border-radius:6px;">DISCONNECTED</div>
         </div>
 
@@ -171,12 +97,20 @@
 
         <button id="connectBtn" class="main-btn btn-connect">TAP TO CONNECT</button>
         
-        <div id="controlPanel" style="display:none;"> <button id="startBtn" class="main-btn btn-start">START WORKOUT</button>
-            <div class="jump-row">
+        <div id="controlPanel" style="display:none;"> 
+            <button id="startBtn" class="main-btn btn-start">START WORKOUT</button>
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
                 <button id="prevBtn" class="btn-jump">← PREV</button>
                 <button id="nextBtn" class="btn-jump">NEXT →</button>
             </div>
-            <button id="stopBtn" class="main-btn btn-stop" style="background:#ef4444;">STOP</button>
+            <button id="stopBtn" class="main-btn btn-stop">STOP</button>
+        </div>
+
+        <div class="history-panel">
+            <div class="history-title">Recent Workouts</div>
+            <div id="historyList">
+                <div style="font-size:11px; color:var(--text-muted); font-style:italic;">No records yet</div>
+            </div>
         </div>
         
         <div style="margin-top:auto; padding-top:20px;">
@@ -186,9 +120,8 @@
 
     <div class="content">
         <div class="chart-box"><canvas id="workoutChart"></canvas></div>
-        
         <div style="text-align:center; margin-bottom:25px;">
-            <div id="totalLabel" style="color:#94a3b8; font-size:14px; text-transform:uppercase; letter-spacing:1px; font-weight:bold;">Total Time</div>
+            <div id="totalLabel" style="color:#94a3b8; font-size:14px; text-transform:uppercase; font-weight:bold;">Total Time</div>
             <div id="globalTimer" class="global-timer">00:00</div>
         </div>
 
@@ -196,66 +129,29 @@
             <div id="card_warmup" class="phase-card">
                 <div class="phase-header"><span style="color:#a5b4fc">WARM UP</span><span id="timer_warmup">00:00</span></div>
                 <div class="controls-row">
-                    <div class="control-group">
-                        <button id="btn_warmup_res_minus" class="ctrl-btn">-</button>
-                        <span style="font-size:10px; color:#94a3b8; margin-right:5px;">LVL</span>
-                        <span id="val_res_warmup" style="font-weight:bold; font-size:18px; width:30px; text-align:center;">--</span>
-                        <button id="btn_warmup_res_plus" class="ctrl-btn">+</button>
-                    </div>
-                    <div class="control-group">
-                        <button id="btn_warmup_time_minus" class="ctrl-btn">-</button>
-                        <span style="font-size:10px; color:#94a3b8; margin-right:5px;">MIN</span>
-                        <span id="val_time_warmup" style="font-weight:bold; font-size:18px; width:30px; text-align:center;">--</span>
-                        <button id="btn_warmup_time_plus" class="ctrl-btn">+</button>
-                    </div>
+                    <div class="control-group"><button id="btn_warmup_res_minus" class="ctrl-btn">-</button><span id="val_res_warmup" style="font-weight:bold; font-size:18px;">--</span><button id="btn_warmup_res_plus" class="ctrl-btn">+</button></div>
+                    <div class="control-group"><button id="btn_warmup_time_minus" class="ctrl-btn">-</button><span id="val_time_warmup" style="font-weight:bold; font-size:18px;">--</span><button id="btn_warmup_time_plus" class="ctrl-btn">+</button></div>
                 </div>
             </div>
-
             <div id="card_workout1" class="phase-card">
                 <div class="phase-header"><span style="color:#86efac">WORKOUT 1</span><span id="timer_workout1">00:00</span></div>
                 <div class="controls-row">
-                    <div class="control-group">
-                        <button id="btn_workout1_res_minus" class="ctrl-btn">-</button>
-                        <span id="val_res_workout1" style="font-weight:bold; font-size:18px; width:40px; text-align:center;">--</span>
-                        <button id="btn_workout1_res_plus" class="ctrl-btn">+</button>
-                    </div>
-                    <div class="control-group">
-                        <button id="btn_workout1_time_minus" class="ctrl-btn">-</button>
-                        <span id="val_time_workout1" style="font-weight:bold; font-size:18px; width:40px; text-align:center;">--</span>
-                        <button id="btn_workout1_time_plus" class="ctrl-btn">+</button>
-                    </div>
+                    <div class="control-group"><button id="btn_workout1_res_minus" class="ctrl-btn">-</button><span id="val_res_workout1" style="font-weight:bold; font-size:18px;">--</span><button id="btn_workout1_res_plus" class="ctrl-btn">+</button></div>
+                    <div class="control-group"><button id="btn_workout1_time_minus" class="ctrl-btn">-</button><span id="val_time_workout1" style="font-weight:bold; font-size:18px;">--</span><button id="btn_workout1_time_plus" class="ctrl-btn">+</button></div>
                 </div>
             </div>
-
             <div id="card_workout2" class="phase-card">
                 <div class="phase-header"><span style="color:#fcd34d">WORKOUT 2</span><span id="timer_workout2">00:00</span></div>
                 <div class="controls-row">
-                    <div class="control-group">
-                        <button id="btn_workout2_res_minus" class="ctrl-btn">-</button>
-                        <span id="val_res_workout2" style="font-weight:bold; font-size:18px; width:40px; text-align:center;">--</span>
-                        <button id="btn_workout2_res_plus" class="ctrl-btn">+</button>
-                    </div>
-                    <div class="control-group">
-                        <button id="btn_workout2_time_minus" class="ctrl-btn">-</button>
-                        <span id="val_time_workout2" style="font-weight:bold; font-size:18px; width:40px; text-align:center;">--</span>
-                        <button id="btn_workout2_time_plus" class="ctrl-btn">+</button>
-                    </div>
+                    <div class="control-group"><button id="btn_workout2_res_minus" class="ctrl-btn">-</button><span id="val_res_workout2" style="font-weight:bold; font-size:18px;">--</span><button id="btn_workout2_res_plus" class="ctrl-btn">+</button></div>
+                    <div class="control-group"><button id="btn_workout2_time_minus" class="ctrl-btn">-</button><span id="val_time_workout2" style="font-weight:bold; font-size:18px;">--</span><button id="btn_workout2_time_plus" class="ctrl-btn">+</button></div>
                 </div>
             </div>
-
             <div id="card_cooldown" class="phase-card">
                 <div class="phase-header"><span style="color:#93c5fd">COOL DOWN</span><span id="timer_cooldown">00:00</span></div>
                 <div class="controls-row">
-                    <div class="control-group">
-                        <button id="btn_cooldown_res_minus" class="ctrl-btn">-</button>
-                        <span id="val_res_cooldown" style="font-weight:bold; font-size:18px; width:40px; text-align:center;">--</span>
-                        <button id="btn_cooldown_res_plus" class="ctrl-btn">+</button>
-                    </div>
-                    <div class="control-group">
-                        <button id="btn_cooldown_time_minus" class="ctrl-btn">-</button>
-                        <span id="val_time_cooldown" style="font-weight:bold; font-size:18px; width:40px; text-align:center;">--</span>
-                        <button id="btn_cooldown_time_plus" class="ctrl-btn">+</button>
-                    </div>
+                    <div class="control-group"><button id="btn_cooldown_res_minus" class="ctrl-btn">-</button><span id="val_res_cooldown" style="font-weight:bold; font-size:18px;">--</span><button id="btn_cooldown_res_plus" class="ctrl-btn">+</button></div>
+                    <div class="control-group"><button id="btn_cooldown_time_minus" class="ctrl-btn">-</button><span id="val_time_cooldown" style="font-weight:bold; font-size:18px;">--</span><button id="btn_cooldown_time_plus" class="ctrl-btn">+</button></div>
                 </div>
             </div>
         </div>
@@ -263,26 +159,20 @@
 </div>
 
 <script>
-    // --- 1. CONFIG & STATE ---
+    // --- STATE ---
     const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
     const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
     const CTRL_UUID = "00002ad9-0000-1000-8000-00805f9b34fb";
 
-    let controlChar = null;
-    let connectedDevice = null;
-    let currentStatus = 'IDLE'; 
-    let currentPhase = null; 
+    let controlChar = null, connectedDevice = null;
+    let currentStatus = 'IDLE', currentPhase = null; 
     const phaseOrder = ['warmup', 'workout1', 'workout2', 'cooldown'];
     
-    let wakeLock = null;
-    let audioCtx = null;
-
-    let targetResistance = 1; 
-    let sentResistance = -99; 
-    let isWriting = false;    
-    let lastCmdTime = 0;
-    let syncInterval = null;
+    let currentRPM = 0;
+    let rpmSamples = []; // For average calculation
     let workoutInterval;
+    let targetResistance = 1, sentResistance = -99;
+    let isWriting = false;
 
     const defaultPhases = {
         warmup:   { mins: 3,  res: 15 },
@@ -293,484 +183,280 @@
     let phases = JSON.parse(JSON.stringify(defaultPhases));
     let ui = {};
 
-    // --- 2. STARTUP ---
-    window.onload = function() {
-        try { initApp(); } 
-        catch(e) { rawLog(`INIT ERROR: ${e.message}`, 'err'); }
-    };
-
-    function initApp() {
+    window.onload = () => {
         ui = {
             btStatus: document.getElementById('btStatus'),
             connectBtn: document.getElementById('connectBtn'),
-            controlPanel: document.getElementById('controlPanel'), // New container
+            controlPanel: document.getElementById('controlPanel'),
             startBtn: document.getElementById('startBtn'),
             canvas: document.getElementById('workoutChart'),
             globalTimer: document.getElementById('globalTimer'),
-            totalLabel: document.getElementById('totalLabel'),
-            res: document.getElementById('resVal')
+            historyList: document.getElementById('historyList'),
+            res: document.getElementById('resVal'),
+            rpm: document.getElementById('rpmVal')
         };
-
-        safeBind('connectBtn', startScan);
-        safeBind('startBtn', toggleWorkout);
-        safeBind('stopBtn', stopWorkout);
-        safeBind('resetBtn', factoryReset);
-        safeBind('prevBtn', () => jumpPhase('prev'));
-        safeBind('nextBtn', () => jumpPhase('next'));
-
-        ['warmup', 'workout1', 'workout2', 'cooldown'].forEach(key => {
-            safeBind(`btn_${key}_res_minus`, () => adjRes(key, -1));
-            safeBind(`btn_${key}_res_plus`, () => adjRes(key, 1));
-            safeBind(`btn_${key}_time_minus`, () => adjTime(key, -1));
-            safeBind(`btn_${key}_time_plus`, () => adjTime(key, 1));
-        });
-
-        document.addEventListener('visibilitychange', async () => {
-            if (wakeLock !== null && document.visibilityState === 'visible') {
-                await requestWakeLock();
-            }
-        });
-
+        initEvents();
         loadSettings();
+        displayHistory();
         refreshUI();
-        
-        if(syncInterval) clearInterval(syncInterval);
-        syncInterval = setInterval(bleSyncLoop, 250);
-
-        // Chart Init
-        setTimeout(() => { resizeCanvas(); drawChart(); }, 300);
+        setInterval(bleSyncLoop, 250);
+        resizeCanvas(); drawChart();
         window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
-        
-        rawLog("System Ready V1.3 Mobile");
+    };
+
+    function initEvents() {
+        document.getElementById('connectBtn').onclick = startScan;
+        document.getElementById('startBtn').onclick = toggleWorkout;
+        document.getElementById('stopBtn').onclick = stopWorkout;
+        document.getElementById('resetBtn').onclick = factoryReset;
+        document.getElementById('prevBtn').onclick = () => jumpPhase('prev');
+        document.getElementById('nextBtn').onclick = () => jumpPhase('next');
+
+        phaseOrder.forEach(key => {
+            document.getElementById(`btn_${key}_res_minus`).onclick = () => adjRes(key, -1);
+            document.getElementById(`btn_${key}_res_plus`).onclick = () => adjRes(key, 1);
+            document.getElementById(`btn_${key}_time_minus`).onclick = () => adjTime(key, -1);
+            document.getElementById(`btn_${key}_time_plus`).onclick = () => adjTime(key, 1);
+        });
     }
 
-    function safeBind(id, fn) {
-        const el = document.getElementById(id);
-        if(el) el.addEventListener('click', fn);
-    }
-
-    // --- 3. BLUETOOTH CORE ---
+    // --- BLUETOOTH ---
     async function startScan() {
-        initAudio(); // iOS Audio Unlock
-
-        if(!navigator.bluetooth) return alert("Browser does not support Web Bluetooth.");
+        if(!navigator.bluetooth) return alert("Bluetooth not supported");
         try {
             ui.connectBtn.innerText = "Scanning...";
-            const dev = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true, 
-                optionalServices: [FTMS_UUID]
-            });
-            
+            const dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [FTMS_UUID] });
             connectedDevice = dev;
-            rawLog(`Device: ${dev.name}`);
-            
             dev.addEventListener('gattserverdisconnected', onDisconnect);
             const server = await dev.gatt.connect();
             const svc = await server.getPrimaryService(FTMS_UUID);
             controlChar = await svc.getCharacteristic(CTRL_UUID);
             const dataChar = await svc.getCharacteristic(DATA_UUID);
-            
             await dataChar.startNotifications();
             dataChar.addEventListener('characteristicvaluechanged', parseData);
-
-            // Handshake
-            await sendHexDirect(0x00); 
-            await sleep(200); 
-            await sendHexDirect(0x07);
-            await sleep(200);
-
+            await controlChar.writeValue(new Uint8Array([0x00])); 
+            await controlChar.writeValue(new Uint8Array([0x07]));
             ui.btStatus.innerText = "CONNECTED";
             ui.btStatus.style.color = "#10b981";
-            ui.btStatus.style.border = "1px solid #10b981";
-            
             ui.connectBtn.style.display = 'none';
-            ui.controlPanel.style.display = 'block'; // Show controls
-            
-            requestWakeLock();
-            
-        } catch(e) {
-            ui.connectBtn.innerText = "TAP TO CONNECT";
-            rawLog(`Connect Fail: ${e.message}`, 'err');
+            ui.controlPanel.style.display = 'block';
+        } catch(e) { ui.connectBtn.innerText = "TAP TO CONNECT"; }
+    }
+
+    function parseData(e) {
+        const v = e.target.value, f = v.getUint16(0, true);
+        let off = 2;
+        if(!(f&1)) { document.getElementById('spdVal').innerText = (v.getUint16(off,true)*0.01).toFixed(1); off+=2; }
+        if(f&2) off+=2;
+        if(f&4) { 
+            currentRPM = Math.floor(v.getUint16(off,true)*0.5); 
+            ui.rpm.innerText = currentRPM;
+            off+=2; 
         }
+        if(f&8) off+=2; if(f&16) off+=3;
+        if(f&32) { if(currentStatus !== 'IDLE') ui.res.innerText = v.getInt16(off, true); off+=2; }
+        if(f&64) document.getElementById('pwrVal').innerText = v.getInt16(off,true);
     }
 
-    async function requestWakeLock() {
-        try {
-            if('wakeLock' in navigator) {
-                wakeLock = await navigator.wakeLock.request('screen');
-            }
-        } catch(err) { console.log(err); }
-    }
-
-    async function releaseWakeLock() {
-        if(wakeLock !== null) {
-            await wakeLock.release();
-            wakeLock = null;
-        }
-    }
-
-    function initAudio() {
-        if(!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if(audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
-    }
-
-    function playAlert() {
-        if(!audioCtx) return;
-        try {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
-            osc.frequency.setValueAtTime(440, audioCtx.currentTime + 0.5); 
-            
-            gain.gain.setValueAtTime(1.0, audioCtx.currentTime); // Louder for mobile
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
-
-            osc.start();
-            osc.stop(audioCtx.currentTime + 1);
-        } catch(e) {}
-    }
-
-    // Traffic Control
-    let lastWriteTime = 0;
     async function bleSyncLoop() {
-        if(!controlChar) return;
-        if(isWriting && (Date.now() - lastWriteTime > 1000)) isWriting = false; // Watchdog
-
-        if(isWriting) return;
-        
-        if(targetResistance !== sentResistance) {
-            isWriting = true;
-            lastWriteTime = Date.now();
-            
-            try {
-                if(ui.res && currentStatus !== 'IDLE') ui.res.innerText = targetResistance;
-
-                await controlChar.writeValue(new Uint8Array([0x07]));
-                await sleep(40); 
-
-                const buf = new ArrayBuffer(3);
-                const v = new DataView(buf);
-                v.setUint8(0, 0x04); 
-                v.setUint16(1, targetResistance * 10, true); 
-                
-                await controlChar.writeValue(buf);
-                sentResistance = targetResistance;
-                lastCmdTime = Date.now();
-                
-            } catch(e) {
-                sentResistance = -99; 
-            } finally {
-                isWriting = false;
-            }
-        }
+        if(!controlChar || isWriting || targetResistance === sentResistance) return;
+        isWriting = true;
+        try {
+            const buf = new Uint8Array([0x04, 0, 0]);
+            const val = targetResistance * 10;
+            buf[1] = val & 0xFF; buf[2] = (val >> 8) & 0xFF;
+            await controlChar.writeValue(buf);
+            sentResistance = targetResistance;
+        } catch(e) {} finally { isWriting = false; }
     }
-    
-    async function sendHexDirect(b) {
-        if(controlChar) await controlChar.writeValue(new Uint8Array([b])).catch(e=>{});
-    }
-    
+
     function onDisconnect() {
         ui.btStatus.innerText = "DISCONNECTED";
-        ui.btStatus.style.color = "#64748b";
-        ui.btStatus.style.border = "none";
-
         ui.connectBtn.style.display = 'block';
-        ui.connectBtn.innerText = "RECONNECT";
         ui.controlPanel.style.display = 'none';
-
-        if(currentStatus!=='IDLE') stopWorkout();
-        controlChar = null;
-        connectedDevice = null;
-        releaseWakeLock();
+        stopWorkout();
     }
 
-    // --- 4. WORKOUT LOGIC ---
+    // --- WORKOUT ---
     function toggleWorkout() {
-        initAudio();
-        if(currentStatus==='IDLE') startWorkout();
-        else if(currentStatus==='RUNNING') pauseWorkout();
-        else resumeWorkout();
+        if(currentStatus==='IDLE') {
+            rpmSamples = [];
+            currentPhase = 'warmup';
+            currentStatus = 'RUNNING';
+            activatePhase('warmup');
+            workoutInterval = setInterval(timerLoop, 1000);
+        } else if(currentStatus==='RUNNING') {
+            currentStatus = 'PAUSED';
+            clearInterval(workoutInterval);
+        } else {
+            currentStatus = 'RUNNING';
+            workoutInterval = setInterval(timerLoop, 1000);
+        }
+        updateBtns();
     }
 
-    function startWorkout() {
-        saveSettings();
-        if(!controlChar) { /* Demo mode logic if needed */ }
-        
-        requestWakeLock();
-        sendHexDirect(0x07); 
-        
-        if(!currentPhase) currentPhase = 'warmup';
-        currentStatus = 'RUNNING';
-        updateBtns();
-        
-        if(workoutInterval) clearInterval(workoutInterval);
-        workoutInterval = setInterval(timerLoop, 1000);
-        
-        activatePhase(currentPhase);
+    function timerLoop() {
+        // Collect RPM sample
+        if(currentRPM > 0) rpmSamples.push(currentRPM);
+
+        if(phases[currentPhase].remainingSecs > 0) {
+            phases[currentPhase].remainingSecs--;
+        } else {
+            let idx = phaseOrder.indexOf(currentPhase);
+            if(idx < phaseOrder.length - 1) {
+                activatePhase(phaseOrder[idx+1]);
+            } else {
+                saveWorkoutToHistory();
+                stopWorkout();
+                alert("Workout Finished!");
+            }
+        }
+        refreshUI(); drawChart();
     }
 
-    function pauseWorkout() {
-        currentStatus = 'PAUSED';
-        clearInterval(workoutInterval);
-        updateBtns();
-        releaseWakeLock();
+    function saveWorkoutToHistory() {
+        let totalMins = 0;
+        for(let k in phases) totalMins += phases[k].mins;
+        
+        const avgRpm = rpmSamples.length > 0 
+            ? Math.round(rpmSamples.reduce((a,b)=>a+b) / rpmSamples.length) 
+            : 0;
+
+        const now = new Date();
+        const endTime = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
+        
+        const record = {
+            date: now.toLocaleDateString(),
+            end: endTime,
+            duration: totalMins,
+            avgRpm: avgRpm
+        };
+
+        let history = JSON.parse(localStorage.getItem('horizon_history') || '[]');
+        history.unshift(record);
+        localStorage.setItem('horizon_history', JSON.stringify(history.slice(0, 5)));
+        displayHistory();
     }
 
-    function resumeWorkout() {
-        currentStatus = 'RUNNING';
-        updateBtns();
-        requestWakeLock();
-        workoutInterval = setInterval(timerLoop, 1000);
-        sentResistance = -99; 
+    function displayHistory() {
+        const history = JSON.parse(localStorage.getItem('horizon_history') || '[]');
+        if (history.length === 0) {
+            ui.historyList.innerHTML = '<div style="font-size:11px; color:var(--text-muted); font-style:italic;">No records yet</div>';
+            return;
+        }
+        ui.historyList.innerHTML = history.map(h => `
+            <div class="history-item">
+                <div class="history-row">
+                    <span style="font-weight:bold; color:var(--primary); font-size:13px;">${h.duration} MIN</span>
+                    <span style="font-weight:800; color:var(--c-rpm); font-size:13px;">${h.avgRpm} <small>AVG RPM</small></span>
+                </div>
+                <div class="history-meta">${h.date} • Finished at ${h.end}</div>
+            </div>
+        `).join('');
     }
 
     function stopWorkout() {
-        currentStatus = 'IDLE';
-        currentPhase = null;
+        currentStatus = 'IDLE'; currentPhase = null;
         clearInterval(workoutInterval);
-        updateBtns();
         document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
-        resetTimers(); refreshUI();
-        
-        targetResistance = 1; 
-        saveSettings(); drawChart();
-        releaseWakeLock();
-    }
-
-    function jumpPhase(dir) {
-        let idx = phaseOrder.indexOf(currentPhase||'warmup');
-        if(dir==='next') idx++; else idx--;
-        if(idx<0 || idx>=phaseOrder.length) return;
-        
-        const k = phaseOrder[idx];
-        phases[k].remainingSecs = phases[k].mins*60;
-        activatePhase(k);
-        refreshUI(); drawChart();
+        resetTimers(); updateBtns(); refreshUI(); drawChart();
     }
 
     function activatePhase(k) {
         currentPhase = k;
         document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
-        const c = document.getElementById(`card_${k}`);
-        if(c) {
-            c.classList.add('active');
-            // Auto scroll to active card on mobile
-            if(window.innerWidth < 820) {
-                 c.scrollIntoView({behavior: "smooth", block: "center"});
-            }
-        }
-        
-        sentResistance = -99; 
+        document.getElementById(`card_${k}`).classList.add('active');
         targetResistance = phases[k].res;
-        if(ui.res) ui.res.innerText = targetResistance;
     }
 
-    function timerLoop() {
-        if(!currentPhase) return;
-        if(phases[currentPhase].remainingSecs > 0) phases[currentPhase].remainingSecs--;
-        else {
-            let idx = phaseOrder.indexOf(currentPhase);
-            if(idx < phaseOrder.length - 1) {
-                activatePhase(phaseOrder[idx+1]);
-            }
-            else { 
-                playAlert();
-                if(connectedDevice && connectedDevice.gatt.connected) {
-                    connectedDevice.gatt.disconnect();
-                } else {
-                    stopWorkout();
-                }
-                alert("Workout Finished!"); 
-            }
+    function jumpPhase(dir) {
+        let idx = phaseOrder.indexOf(currentPhase||'warmup');
+        idx = dir==='next' ? idx+1 : idx-1;
+        if(idx>=0 && idx<phaseOrder.length) {
+            phases[phaseOrder[idx]].remainingSecs = phases[phaseOrder[idx]].mins*60;
+            activatePhase(phaseOrder[idx]);
+            refreshUI(); drawChart();
         }
-        refreshUI(); drawChart();
     }
 
-    // --- 5. DATA & UI ---
+    // --- UI & STORAGE ---
     function adjTime(p, d) {
-        if(phases[p].mins+d < 1) return;
-        phases[p].mins += d;
-        if(currentStatus==='IDLE' || currentPhase!==p) phases[p].remainingSecs = phases[p].mins*60;
-        else {
-            phases[p].remainingSecs += (d*60);
-            if(phases[p].remainingSecs < 0) phases[p].remainingSecs = 0;
-        }
-        refreshUI(); drawChart();
+        phases[p].mins = Math.max(1, phases[p].mins + d);
+        phases[p].remainingSecs = phases[p].mins * 60;
+        refreshUI(); drawChart(); saveSettings();
     }
 
     function adjRes(p, d) {
-        phases[p].res += d;
-        if(phases[p].res<1) phases[p].res=1;
-        if(phases[p].res>32) phases[p].res=32;
-        
-        if(currentPhase===p) {
-            targetResistance = phases[p].res;
-        }
-        refreshUI(); drawChart();
-    }
-
-    function parseData(e) {
-        const v = e.target.value;
-        const f = v.getUint16(0, true);
-        let off = 2;
-
-        if(!(f&1)) { 
-            document.getElementById('spdVal').innerText = (v.getUint16(off,true)*0.01).toFixed(1); 
-            off+=2; 
-        }
-        if(f&2) off+=2;
-        
-        if(f&4) { 
-            document.getElementById('rpmVal').innerText = Math.floor(v.getUint16(off,true)*0.5); 
-            off+=2; 
-        }
-        if(f&8) off+=2;
-        if(f&16) off+=3;
-        
-        if(f&32) {
-            const realLevel = v.getInt16(off, true);
-            if (Date.now() - lastCmdTime > 3000) {
-                if(ui.res) ui.res.innerText = realLevel;
-            }
-            off+=2;
-        }
-        
-        if(f&64) {
-            document.getElementById('pwrVal').innerText = v.getInt16(off,true);
-        }
+        phases[p].res = Math.min(32, Math.max(1, phases[p].res + d));
+        if(currentPhase===p) targetResistance = phases[p].res;
+        refreshUI(); drawChart(); saveSettings();
     }
 
     function refreshUI() {
-        let totalPlanMins = 0;
-        let totalRemainingSecs = 0;
-
+        let totalRem = 0, totalPlan = 0;
         for(let k in phases) {
             document.getElementById(`val_res_${k}`).innerText = phases[k].res;
             document.getElementById(`val_time_${k}`).innerText = phases[k].mins;
             document.getElementById(`timer_${k}`).innerText = fmt(phases[k].remainingSecs);
-            
-            totalPlanMins += phases[k].mins;
-            totalRemainingSecs += phases[k].remainingSecs;
+            totalRem += phases[k].remainingSecs; totalPlan += phases[k].mins;
         }
-        
-        if(ui.globalTimer) ui.globalTimer.innerText = fmt(totalRemainingSecs);
-        if(ui.totalLabel) ui.totalLabel.innerText = "REMAINING (PLAN: " + totalPlanMins + "m)";
+        ui.globalTimer.innerText = fmt(totalRem);
+        document.getElementById('totalLabel').innerText = `REMAINING (PLAN: ${totalPlan}m)`;
+    }
 
-        if(currentStatus !== 'IDLE' && ui.res) {
-            ui.res.innerText = targetResistance;
-        }
-    }
-    
-    function fmt(s) {
-        let m=Math.floor(s/60), sec=s%60;
-        return `${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}`;
-    }
+    function fmt(s) { return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
 
     function updateBtns() {
-        if(currentStatus==='IDLE') { ui.startBtn.innerText="START WORKOUT"; ui.startBtn.style.background="#10b981"; }
+        if(currentStatus==='IDLE') { ui.startBtn.innerText="START"; ui.startBtn.style.background="#10b981"; }
         else if(currentStatus==='RUNNING') { ui.startBtn.innerText="PAUSE"; ui.startBtn.style.background="#f59e0b"; }
         else { ui.startBtn.innerText="RESUME"; ui.startBtn.style.background="#10b981"; }
     }
 
-    // --- 6. UTILS ---
     function loadSettings() {
-        try {
-            const saved = localStorage.getItem('horizon_v33');
-            if(saved) {
-                const p = JSON.parse(saved);
-                for(let k in phases) { if(p[k]) { phases[k].mins=p[k].mins; phases[k].res=p[k].res; }}
-            }
-        } catch(e) {}
+        const saved = localStorage.getItem('horizon_v33');
+        if(saved) {
+            const p = JSON.parse(saved);
+            for(let k in phases) if(p[k]) { phases[k].mins=p[k].mins; phases[k].res=p[k].res; }
+        }
         resetTimers();
     }
-
     function saveSettings() {
-        try {
-            const toSave = {};
-            for(let k in phases) toSave[k] = { mins:phases[k].mins, res:phases[k].res };
-            localStorage.setItem('horizon_v33', JSON.stringify(toSave));
-        } catch(e) {}
+        const toSave = {};
+        for(let k in phases) toSave[k] = { mins:phases[k].mins, res:phases[k].res };
+        localStorage.setItem('horizon_v33', JSON.stringify(toSave));
     }
-
+    function resetTimers() { for(let k in phases) phases[k].remainingSecs = phases[k].mins*60; }
     function factoryReset() {
-        if(!confirm("Reset all settings?")) return;
-        localStorage.removeItem('horizon_v33');
-        phases = JSON.parse(JSON.stringify(defaultPhases));
-        resetTimers(); refreshUI(); drawChart();
+        if(confirm("Reset all?")) { localStorage.clear(); location.reload(); }
     }
-
-    function resetTimers() {
-        for(let k in phases) phases[k].remainingSecs = phases[k].mins * 60;
-        refreshUI();
-    }
-
-    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
     function resizeCanvas() {
-        const b = ui.canvas.parentElement;
-        const d = window.devicePixelRatio||1;
-        // Fix for mobile layout shifts
-        if(b.clientWidth === 0) return;
-        
-        ui.canvas.width = b.clientWidth*d;
-        ui.canvas.height = b.clientHeight*d;
+        const b = ui.canvas.parentElement, d = window.devicePixelRatio||1;
+        ui.canvas.width = b.clientWidth*d; ui.canvas.height = b.clientHeight*d;
         ui.canvas.getContext('2d').scale(d,d);
     }
 
     function drawChart() {
-        const ctx = ui.canvas.getContext('2d');
-        const d = window.devicePixelRatio||1;
-        const W = ui.canvas.width / d;
-        const H = ui.canvas.height / d;
+        const ctx = ui.canvas.getContext('2d'), d = window.devicePixelRatio||1;
+        const W = ui.canvas.width/d, H = ui.canvas.height/d;
         ctx.clearRect(0,0,W,H);
-        
         let tm = 0; phaseOrder.forEach(k=>tm+=phases[k].mins);
-        if(tm===0) tm=1;
-
-        const padL=30, padB=20;
-        const gw=W-padL, gh=H-padB;
-        const pxM = gw/tm;
-        const pxL = gh/35;
-
-        // Grid
-        ctx.strokeStyle="#334155"; ctx.fillStyle="#94a3b8"; ctx.font="10px monospace";
-        ctx.textAlign="right"; ctx.textBaseline="middle";
-        for(let l=0; l<=35; l+=5) {
+        const padL=30, padB=20, gw=W-padL, gh=H-padB;
+        const pxM = gw/(tm||1), pxL = gh/35;
+        ctx.strokeStyle="#334155"; ctx.fillStyle="#94a3b8"; ctx.font="10px Arial";
+        for(let l=0; l<=35; l+=10) {
             let y = gh - (l*pxL);
             ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W,y); ctx.stroke();
-            ctx.fillText(l, padL-5, y);
+            ctx.fillText(l, 5, y+3);
         }
-
-        ctx.textAlign="center"; ctx.textBaseline="top";
-        let step = tm<=15?2:5;
-        for(let t=0; t<=tm; t+=step) {
-            let x = padL + (t*pxM);
-            ctx.fillText(t, x, gh+4);
-        }
-
         let cx = 0;
         phaseOrder.forEach(k=>{
-            const w = phases[k].mins*pxM;
-            const h = phases[k].res*pxL;
-            
-            // Draw Background Bar
-            ctx.fillStyle="#475569"; 
-            ctx.fillRect(padL+cx, gh-h, w, h);
-            
-            // Draw Progress Overlay
-            const dur = phases[k].mins*60;
-            const elap = dur - phases[k].remainingSecs;
-            if(elap>0) {
-                ctx.fillStyle="rgba(59,130,246,0.8)"; // Brighter blue
-                ctx.fillRect(padL+cx, gh-h, (elap/dur)*w, h);
+            const w = phases[k].mins*pxM, h = phases[k].res*pxL;
+            ctx.fillStyle="#475569"; ctx.fillRect(padL+cx, gh-h, w, h);
+            if(currentPhase===k || phaseOrder.indexOf(currentPhase) > phaseOrder.indexOf(k)) {
+                const ratio = currentPhase===k ? (phases[k].mins*60 - phases[k].remainingSecs)/(phases[k].mins*60) : 1;
+                ctx.fillStyle="rgba(59,130,246,0.7)";
+                ctx.fillRect(padL+cx, gh-h, w*ratio, h);
             }
             cx+=w;
         });
