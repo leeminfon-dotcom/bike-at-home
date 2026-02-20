@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Horizon V1.3 (Mod History)</title>
+    <title>Horizon V1.3 (Mod History + Time Fix)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -309,8 +309,9 @@
     let syncInterval = null;
     let workoutInterval;
     
-    // [NEW] Stats
+    // [NEW] Stats & Actual Timer
     let rpmSamples = [];
+    let actualWorkoutSecs = 0; 
 
     const defaultPhases = {
         warmup:   { mins: 3,  res: 15 },
@@ -373,7 +374,7 @@
         setTimeout(() => { resizeCanvas(); drawChart(); }, 300);
         window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
         
-        rawLog("System Ready V1.3 History Mod");
+        rawLog("System Ready V1.3 History Mod + Time Fix");
     }
 
     function safeBind(id, fn) {
@@ -541,6 +542,7 @@
         
         // [MOD] Fix Start Logic & Reset Data
         rpmSamples = [];
+        actualWorkoutSecs = 0; // Reset real timer
         currentStatus = 'RUNNING';
         updateBtns();
         
@@ -563,7 +565,7 @@
         updateBtns();
         requestWakeLock();
         
-        sentResistance = -99; // [MOD] Force sync on resume
+        sentResistance = -99; // Force sync on resume
         workoutInterval = setInterval(timerLoop, 1000);
     }
 
@@ -582,12 +584,19 @@
 
     function jumpPhase(dir) {
         let idx = phaseOrder.indexOf(currentPhase||'warmup');
-        if(dir==='next') idx++; else idx--;
-        if(idx<0 || idx>=phaseOrder.length) return;
+        let newIdx = dir === 'next' ? idx + 1 : idx - 1;
         
-        const k = phaseOrder[idx];
-        phases[k].remainingSecs = phases[k].mins*60;
-        activatePhase(k);
+        if(newIdx < 0 || newIdx >= phaseOrder.length) return;
+        
+        // [MOD] Adjust remaining seconds for accurate UI Global Timer
+        if (dir === 'next') {
+            phases[currentPhase].remainingSecs = 0; // Finish current
+        } else {
+            phases[currentPhase].remainingSecs = phases[currentPhase].mins * 60; // Reset current
+            phases[phaseOrder[newIdx]].remainingSecs = phases[phaseOrder[newIdx]].mins * 60; // Reset target
+        }
+        
+        activatePhase(phaseOrder[newIdx]);
         refreshUI(); drawChart();
     }
 
@@ -603,7 +612,7 @@
             }
         }
         
-        // [MOD] FIX: Force logic change so bleSyncLoop picks it up immediately
+        // Force logic change so bleSyncLoop picks it up immediately
         sentResistance = -99; 
         targetResistance = phases[k].res;
         if(ui.res) ui.res.innerText = targetResistance;
@@ -616,6 +625,9 @@
         const curRpm = parseInt(ui.rpm.innerText);
         if(curRpm > 0) rpmSamples.push(curRpm);
 
+        // [NEW] Accumulate actual workout time
+        actualWorkoutSecs++; 
+
         if(phases[currentPhase].remainingSecs > 0) phases[currentPhase].remainingSecs--;
         else {
             let idx = phaseOrder.indexOf(currentPhase);
@@ -624,7 +636,7 @@
             }
             else { 
                 playAlert();
-                saveWorkoutToHistory(); // [NEW] Save before stop
+                saveWorkoutToHistory(); // Save before stop
                 if(connectedDevice && connectedDevice.gatt.connected) {
                     connectedDevice.gatt.disconnect();
                 } else {
@@ -639,8 +651,9 @@
     // --- 5. DATA & UI ---
     // [NEW] History Logic
     function saveWorkoutToHistory() {
-        let totalPlanMins = 0;
-        for(let k in phases) totalPlanMins += phases[k].mins;
+        // [MOD] Use actual workout time instead of planned time
+        // (Ensure at least 1 min is logged if they worked out briefly)
+        const actualMins = Math.max(1, Math.round(actualWorkoutSecs / 60));
 
         const avgRpm = rpmSamples.length > 0 
             ? Math.round(rpmSamples.reduce((a,b)=>a+b) / rpmSamples.length) 
@@ -652,7 +665,7 @@
         const record = {
             date: now.toLocaleDateString(),
             end: endTime,
-            duration: totalPlanMins,
+            duration: actualMins, // Use real time here
             avg: avgRpm
         };
 
@@ -700,7 +713,6 @@
         
         if(currentPhase===p) {
             targetResistance = phases[p].res;
-            // [MOD] Ensure adjustment updates immediately
             sentResistance = -99;
         }
         refreshUI(); drawChart();
@@ -792,7 +804,7 @@
     function factoryReset() {
         if(!confirm("Reset all settings and history?")) return;
         localStorage.removeItem('horizon_v33');
-        localStorage.removeItem('horizon_history'); // [NEW] Clear History
+        localStorage.removeItem('horizon_history'); 
         phases = JSON.parse(JSON.stringify(defaultPhases));
         resetTimers(); refreshUI(); drawChart(); displayHistory();
     }
