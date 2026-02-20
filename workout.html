@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Horizon V1.3 (Mobile)</title>
+    <title>Horizon V1.3 (Mod History + Time Fix)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -151,6 +151,24 @@
         
         /* Debug Console hidden by default */
         #debug-console { display: none; }
+
+        /* [NEW] History Styles */
+        .history-box {
+            background: rgba(0,0,0,0.2); padding: 10px; border-radius: 12px; margin-top: 15px;
+            border: 1px solid #334155;
+        }
+        .history-title {
+            font-size: 11px; font-weight: 800; color: var(--text-muted); 
+            text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+        }
+        .history-item {
+            padding: 8px 0; border-bottom: 1px solid #334155;
+        }
+        .history-item:last-child { border-bottom: none; }
+        .h-row-main { display: flex; justify-content: space-between; align-items: center; }
+        .h-time { font-size: 13px; font-weight: bold; color: var(--primary); }
+        .h-rpm { font-size: 13px; font-weight: 800; color: var(--c-rpm); }
+        .h-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -179,6 +197,13 @@
             <button id="stopBtn" class="main-btn btn-stop" style="background:#ef4444;">STOP</button>
         </div>
         
+        <div id="historyPanel" class="history-box">
+            <div class="history-title">Last 3 Workouts</div>
+            <div id="historyList">
+                <div style="font-size:11px; color:var(--text-muted); font-style:italic;">No records yet</div>
+            </div>
+        </div>
+
         <div style="margin-top:auto; padding-top:20px;">
              <button id="resetBtn" style="background:none; border:1px dashed #475569; color:#64748b; padding:10px; width:100%; border-radius:8px; font-size:12px;">Factory Reset</button>
         </div>
@@ -283,6 +308,10 @@
     let lastCmdTime = 0;
     let syncInterval = null;
     let workoutInterval;
+    
+    // [NEW] Stats & Actual Timer
+    let rpmSamples = [];
+    let actualWorkoutSecs = 0; 
 
     const defaultPhases = {
         warmup:   { mins: 3,  res: 15 },
@@ -308,7 +337,10 @@
             canvas: document.getElementById('workoutChart'),
             globalTimer: document.getElementById('globalTimer'),
             totalLabel: document.getElementById('totalLabel'),
-            res: document.getElementById('resVal')
+            res: document.getElementById('resVal'),
+            // [NEW]
+            rpm: document.getElementById('rpmVal'),
+            historyList: document.getElementById('historyList')
         };
 
         safeBind('connectBtn', startScan);
@@ -333,6 +365,7 @@
 
         loadSettings();
         refreshUI();
+        displayHistory(); // [NEW] Init history
         
         if(syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(bleSyncLoop, 250);
@@ -341,7 +374,7 @@
         setTimeout(() => { resizeCanvas(); drawChart(); }, 300);
         window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
         
-        rawLog("System Ready V1.3 Mobile");
+        rawLog("System Ready V1.3 History Mod + Time Fix");
     }
 
     function safeBind(id, fn) {
@@ -507,14 +540,17 @@
         requestWakeLock();
         sendHexDirect(0x07); 
         
-        if(!currentPhase) currentPhase = 'warmup';
+        // [MOD] Fix Start Logic & Reset Data
+        rpmSamples = [];
+        actualWorkoutSecs = 0; // Reset real timer
         currentStatus = 'RUNNING';
         updateBtns();
         
+        if(!currentPhase) currentPhase = 'warmup';
+        activatePhase(currentPhase); // Must be called AFTER currentStatus = RUNNING
+        
         if(workoutInterval) clearInterval(workoutInterval);
         workoutInterval = setInterval(timerLoop, 1000);
-        
-        activatePhase(currentPhase);
     }
 
     function pauseWorkout() {
@@ -528,8 +564,9 @@
         currentStatus = 'RUNNING';
         updateBtns();
         requestWakeLock();
+        
+        sentResistance = -99; // Force sync on resume
         workoutInterval = setInterval(timerLoop, 1000);
-        sentResistance = -99; 
     }
 
     function stopWorkout() {
@@ -547,12 +584,19 @@
 
     function jumpPhase(dir) {
         let idx = phaseOrder.indexOf(currentPhase||'warmup');
-        if(dir==='next') idx++; else idx--;
-        if(idx<0 || idx>=phaseOrder.length) return;
+        let newIdx = dir === 'next' ? idx + 1 : idx - 1;
         
-        const k = phaseOrder[idx];
-        phases[k].remainingSecs = phases[k].mins*60;
-        activatePhase(k);
+        if(newIdx < 0 || newIdx >= phaseOrder.length) return;
+        
+        // [MOD] Adjust remaining seconds for accurate UI Global Timer
+        if (dir === 'next') {
+            phases[currentPhase].remainingSecs = 0; // Finish current
+        } else {
+            phases[currentPhase].remainingSecs = phases[currentPhase].mins * 60; // Reset current
+            phases[phaseOrder[newIdx]].remainingSecs = phases[phaseOrder[newIdx]].mins * 60; // Reset target
+        }
+        
+        activatePhase(phaseOrder[newIdx]);
         refreshUI(); drawChart();
     }
 
@@ -568,6 +612,7 @@
             }
         }
         
+        // Force logic change so bleSyncLoop picks it up immediately
         sentResistance = -99; 
         targetResistance = phases[k].res;
         if(ui.res) ui.res.innerText = targetResistance;
@@ -575,6 +620,14 @@
 
     function timerLoop() {
         if(!currentPhase) return;
+        
+        // [NEW] Collect Data
+        const curRpm = parseInt(ui.rpm.innerText);
+        if(curRpm > 0) rpmSamples.push(curRpm);
+
+        // [NEW] Accumulate actual workout time
+        actualWorkoutSecs++; 
+
         if(phases[currentPhase].remainingSecs > 0) phases[currentPhase].remainingSecs--;
         else {
             let idx = phaseOrder.indexOf(currentPhase);
@@ -583,6 +636,7 @@
             }
             else { 
                 playAlert();
+                saveWorkoutToHistory(); // Save before stop
                 if(connectedDevice && connectedDevice.gatt.connected) {
                     connectedDevice.gatt.disconnect();
                 } else {
@@ -595,6 +649,52 @@
     }
 
     // --- 5. DATA & UI ---
+    // [NEW] History Logic
+    function saveWorkoutToHistory() {
+        // [MOD] Use actual workout time instead of planned time
+        // (Ensure at least 1 min is logged if they worked out briefly)
+        const actualMins = Math.max(1, Math.round(actualWorkoutSecs / 60));
+
+        const avgRpm = rpmSamples.length > 0 
+            ? Math.round(rpmSamples.reduce((a,b)=>a+b) / rpmSamples.length) 
+            : 0;
+
+        const now = new Date();
+        const endTime = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
+
+        const record = {
+            date: now.toLocaleDateString(),
+            end: endTime,
+            duration: actualMins, // Use real time here
+            avg: avgRpm
+        };
+
+        let history = JSON.parse(localStorage.getItem('horizon_history') || '[]');
+        history.unshift(record);
+        history = history.slice(0, 3); // Keep last 3
+        
+        localStorage.setItem('horizon_history', JSON.stringify(history));
+        displayHistory();
+    }
+
+    function displayHistory() {
+        const history = JSON.parse(localStorage.getItem('horizon_history') || '[]');
+        if (history.length === 0) {
+            ui.historyList.innerHTML = '<div style="font-size:11px; color:var(--text-muted); font-style:italic;">No records yet</div>';
+            return;
+        }
+
+        ui.historyList.innerHTML = history.map(h => `
+            <div class="history-item">
+                <div class="h-row-main">
+                    <span class="h-time">${h.duration} MIN</span>
+                    <span class="h-rpm">${h.avg} <small style="font-size:9px">AVG RPM</small></span>
+                </div>
+                <div class="h-sub">${h.date} • Finished at ${h.end}</div>
+            </div>
+        `).join('');
+    }
+
     function adjTime(p, d) {
         if(phases[p].mins+d < 1) return;
         phases[p].mins += d;
@@ -613,6 +713,7 @@
         
         if(currentPhase===p) {
             targetResistance = phases[p].res;
+            sentResistance = -99;
         }
         refreshUI(); drawChart();
     }
@@ -701,10 +802,11 @@
     }
 
     function factoryReset() {
-        if(!confirm("Reset all settings?")) return;
+        if(!confirm("Reset all settings and history?")) return;
         localStorage.removeItem('horizon_v33');
+        localStorage.removeItem('horizon_history'); 
         phases = JSON.parse(JSON.stringify(defaultPhases));
-        resetTimers(); refreshUI(); drawChart();
+        resetTimers(); refreshUI(); drawChart(); displayHistory();
     }
 
     function resetTimers() {
