@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Horizon V1.3 (Mod History + Time Fix)</title>
+    <title>Horizon V1.3 (Mod History + Time Fix + Auto Start)</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -189,7 +189,7 @@
 
         <button id="connectBtn" class="main-btn btn-connect">TAP TO CONNECT</button>
         
-        <div id="controlPanel" style="display:none;"> <button id="startBtn" class="main-btn btn-start">START WORKOUT</button>
+        <div id="controlPanel" style="display:none;"> <button id="startBtn" class="main-btn btn-start">開始</button>
             <div class="jump-row">
                 <button id="prevBtn" class="btn-jump">← PREV</button>
                 <button id="nextBtn" class="btn-jump">NEXT →</button>
@@ -374,7 +374,7 @@
         setTimeout(() => { resizeCanvas(); drawChart(); }, 300);
         window.addEventListener('resize', () => { resizeCanvas(); drawChart(); });
         
-        rawLog("System Ready V1.3 History Mod + Time Fix");
+        rawLog("System Ready V1.3 History Mod + Time Fix + Auto Start");
     }
 
     function safeBind(id, fn) {
@@ -420,6 +420,11 @@
             ui.controlPanel.style.display = 'block'; // Show controls
             
             requestWakeLock();
+            
+            // [MOD] Auto-start workout upon connection
+            setTimeout(() => {
+                if (currentStatus === 'IDLE') toggleWorkout();
+            }, 300);
             
         } catch(e) {
             ui.connectBtn.innerText = "TAP TO CONNECT";
