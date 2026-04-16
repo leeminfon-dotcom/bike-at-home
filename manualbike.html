@@ -96,7 +96,7 @@
         .jump-row { display: flex; gap: 10px; margin-bottom: 10px; }
         .btn-jump { flex: 1; background: #475569; color: white; border: none; padding: 14px; border-radius: 10px; font-size: 14px; font-weight: bold; }
 
-        .global-timer { font-size: 80px; font-weight: 900; margin: 5px 0 10px 0; font-variant-numeric: tabular-nums; letter-spacing: 2px; color: white; }
+        .global-timer { font-size: 36px; font-weight: 800; margin: 5px 0 10px 0; font-variant-numeric: tabular-nums; letter-spacing: 2px; color: white; }
         
         /* [MOD] iPad Landscape Phase Grid */
         .phase-list { width: 100%; max-width: 800px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -211,9 +211,9 @@
         </div>
 
         <div style="text-align:center;">
-            <div id="totalLabel" style="color:#94a3b8; font-size:16px; text-transform:uppercase; letter-spacing:2px; font-weight:bold;">總剩餘時間</div>
+            <div id="totalLabel" style="color:#94a3b8; font-size:14px; text-transform:uppercase; letter-spacing:2px; font-weight:bold;">總剩餘時間</div>
             <div id="globalTimer" class="global-timer">00:00</div>
-            <div id="currentPhaseInfo" style="font-size:22px; font-weight:bold; color:var(--primary); margin-bottom:25px;">
+            <div id="currentPhaseInfo" style="font-size:64px; font-weight:900; color:var(--primary); margin-bottom:25px; line-height:1.2;">
                 準備就緒
             </div>
         </div>
@@ -663,7 +663,13 @@
         
         // Bike handles real resistance reading, we update UI with it
         if(f&32) {
-            if(ui.res) ui.res.innerText = v.getInt16(off, true);
+            if(ui.res) {
+                ui.res.innerText = v.getInt16(off, true);
+                // 確保使用者轉動旋鈕時，大標題列的「目前阻力」也能即時更新
+                if(currentStatus !== 'IDLE' && currentPhase && ui.currentPhaseInfo) {
+                    ui.currentPhaseInfo.innerText = `${phaseNamesZH[currentPhase]} • 目標阻力 ${targetResistance} (目前 ${ui.res.innerText})`;
+                }
+            }
             off+=2;
         }
         if(f&64) document.getElementById('pwrVal').innerText = v.getInt16(off,true);
@@ -679,11 +685,12 @@
             totalRemainingSecs += phases[k].remainingSecs;
         }
         if(ui.globalTimer) ui.globalTimer.innerText = fmt(totalRemainingSecs);
-        if(ui.totalLabel) ui.totalLabel.innerText = `剩餘時間 (計畫: ${totalPlanMins}分)`;
+        if(ui.totalLabel) ui.totalLabel.innerText = `總剩餘時間 (計畫: ${totalPlanMins}分)`;
 
-        // [NEW] Update current phase info line
+        // [NEW] Update current phase info line with Current Resistance
         if(currentStatus !== 'IDLE' && currentPhase) {
-            ui.currentPhaseInfo.innerText = `${phaseNamesZH[currentPhase]} • 目標阻力 ${targetResistance}`;
+            const currentRes = ui.res ? ui.res.innerText : "--";
+            ui.currentPhaseInfo.innerText = `${phaseNamesZH[currentPhase]} • 目標阻力 ${targetResistance} (目前 ${currentRes})`;
         } else {
             ui.currentPhaseInfo.innerText = "準備就緒";
         }
