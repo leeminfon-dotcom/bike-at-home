@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>飛輪健身 V1.0</title>
+    
+    <script>
+        function rawLog(msg, type='info') {
+            console.log(`[${type}] ${msg}`);
+        }
+    </script>
+
+    <style>
+        :root {
+            --bg: #0f172a; --sidebar: #1e293b; --surface: #334155;
+            --primary: #3b82f6; --text: #f8fafc; --text-muted: #94a3b8;
+            --c-rpm: #10b981; --c-pwr: #f59e0b; --c-spd: #06b6d4; --c-res: #ec4899;
+            --safe-area-bottom: env(safe-area-inset-bottom);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg); color: var(--text);
+            margin: 0; padding: 0;
+            min-height: 100dvh;
+            display: flex; flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Layout Container */
+        .app-container { 
+            display: flex; width: 100%; flex: 1; 
+            overflow: hidden; 
+            height: 100vh;
+        }
+        
+        .sidebar {
+            width: 320px; background: var(--sidebar); padding: 20px; 
+            display: flex; flex-direction: column; border-right: 1px solid #475569;
+            flex-shrink: 0; overflow-y: auto; z-index: 10;
+        }
+
+        .content {
+            flex: 1; padding: 20px; overflow-y: auto; position: relative;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: var(--bg);
+        }
+
+        /* --- Mobile Optimization --- */
+        @media (max-width: 820px) {
+            body { height: auto; overflow-y: auto; }
+            
+            .app-container { 
+                flex-direction: column; height: auto; overflow: visible; 
+            }
+
+            .sidebar { 
+                width: 100%; height: auto; 
+                border-right: none; border-bottom: 1px solid #475569;
+                position: relative; overflow: visible; padding-bottom: 10px;
+            }
+
+            .content { 
+                width: 100%; height: auto; overflow: visible; 
+                padding: 15px; padding-bottom: calc(80px + var(--safe-area-bottom)); 
+            }
+
+            .ctrl-btn { width: 44px !important; height: 44px !important; font-size: 20px !important; }
+            .phase-list { width: 100%; max-width: 100%; gap: 15px; display: flex !important; flex-direction: column; }
+        }
+
+        /* UI Components */
+        .dash-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 15px; }
+        @media (max-width: 360px) { .dash-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .mini-card { background: var(--surface); padding: 8px 5px; border-radius: 12px; text-align: center; }
+        .mini-val { font-size: 22px; font-weight: 800; line-height: 1.2; }
+        .mini-lbl { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+        .c-rpm { color: var(--c-rpm); } .c-pwr { color: var(--c-pwr); } 
+        .c-spd { color: var(--c-spd); } .c-res { color: var(--c-res); }
+
+        .main-btn {
+            width: 100%; padding: 16px; margin-bottom: 12px; border-radius: 12px; border: none; 
+            font-weight: bold; font-size: 18px; color: white; cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s; touch-action: manipulation;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        .main-btn:active { transform: scale(0.98); opacity: 0.9; }
+        .btn-connect { background: var(--primary); }
+        .btn-start { background: #10b981; }
+        .btn-stop { background: #ef4444; }
+        
+        .jump-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .btn-jump { flex: 1; background: #475569; color: white; border: none; padding: 14px; border-radius: 10px; font-size: 14px; font-weight: bold; }
+
+        .global-timer { font-size: 80px; font-weight: 900; margin: 5px 0 10px 0; font-variant-numeric: tabular-nums; letter-spacing: 2px; color: white; }
+        
+        /* [MOD] iPad Landscape Phase Grid */
+        .phase-list { width: 100%; max-width: 800px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        
+        .phase-card { 
+            background: #1e293b; padding: 20px; border-radius: 16px; 
+            border: 2px solid transparent; transition: all 0.3s; 
+        }
+        .phase-card.active { 
+            border-color: var(--primary); background: #1a273e; 
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+            transform: scale(1.02);
+        }
+        
+        .phase-header { 
+            display: flex; justify-content: space-between; margin-bottom: 15px; 
+            font-weight: 700; font-size: 18px; letter-spacing: 0.5px;
+        }
+        
+        .controls-row { display: flex; gap: 12px; }
+        .control-group { 
+            background: rgba(0,0,0,0.3); padding: 10px; border-radius: 12px; 
+            flex: 1; display: flex; justify-content: space-between; align-items: center; 
+        }
+        .ctrl-btn { 
+            width: 40px; height: 40px; border-radius: 10px; border: none; 
+            background: #475569; color: white; font-size: 20px; 
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; touch-action: manipulation;
+        }
+        .ctrl-btn:active { background: #64748b; }
+
+        /* History Styles */
+        .history-box {
+            background: rgba(0,0,0,0.2); padding: 10px; border-radius: 12px; margin-top: 15px; border: 1px solid #334155;
+        }
+        .history-title { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .history-item { padding: 8px 0; border-bottom: 1px solid #334155; }
+        .history-item:last-child { border-bottom: none; }
+        .h-row-main { display: flex; justify-content: space-between; align-items: center; }
+        .h-time { font-size: 13px; font-weight: bold; color: var(--primary); }
+        .h-rpm { font-size: 13px; font-weight: 800; color: var(--c-rpm); }
+        .h-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+        /* [NEW] Alert Overlay */
+        .alert-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(220, 38, 38, 0.95); z-index: 100;
+            display: none; flex-direction: column; justify-content: center; align-items: center;
+            animation: flashBg 0.8s infinite alternate;
+            border-radius: 20px;
+        }
+        @keyframes flashBg {
+            from { background: rgba(239, 68, 68, 0.95); }
+            to { background: rgba(245, 158, 11, 0.95); }
+        }
+        .alert-title { font-size: 24px; font-weight: 800; letter-spacing: 2px; color: rgba(255,255,255,0.9); text-transform: uppercase; }
+        .alert-level { font-size: 120px; font-weight: 900; color: white; margin: 10px 0; line-height: 1; }
+        .alert-sub { font-size: 20px; color: white; margin-bottom: 40px; }
+        .alert-btn { 
+            padding: 15px 50px; font-size: 22px; font-weight: bold; color: #dc2626; 
+            background: white; border: none; border-radius: 40px; cursor: pointer; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .alert-btn:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="sidebar">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <div style="font-weight:900; font-size:22px; letter-spacing:-0.5px; color:#fff;">飛輪健身 <span style="color:var(--primary); font-size:14px;">V1.0</span></div>
+            <div id="btStatus" style="font-size:12px; font-weight:bold; color:#64748b; background:#0f172a; padding:4px 8px; border-radius:6px;">未連線</div>
+        </div>
+
+        <div class="dash-grid">
+            <div class="mini-card"><div id="rpmVal" class="mini-val c-rpm">0</div><div class="mini-lbl">踏頻</div></div>
+            <div class="mini-card"><div id="pwrVal" class="mini-val c-pwr">0</div><div class="mini-lbl">功率</div></div>
+            <div class="mini-card"><div id="spdVal" class="mini-val c-spd">0.0</div><div class="mini-lbl">時速</div></div>
+            <div class="mini-card"><div id="resVal" class="mini-val c-res">1</div><div class="mini-lbl">阻力</div></div>
+        </div>
+
+        <button id="connectBtn" class="main-btn btn-connect">點擊連線</button>
+        
+        <div id="controlPanel" style="display:none;"> 
+            <button id="startBtn" class="main-btn btn-start">開始運動</button>
+            <div class="jump-row">
+                <button id="prevBtn" class="btn-jump">← 上一個</button>
+                <button id="nextBtn" class="btn-jump">下一個 →</button>
+            </div>
+            <button id="stopBtn" class="main-btn btn-stop" style="background:#ef4444;">停止</button>
+        </div>
+        
+        <div id="historyPanel" class="history-box">
+            <div class="history-title">最近 3 次運動</div>
+            <div id="historyList">
+                <div style="font-size:11px; color:var(--text-muted); font-style:italic;">尚無紀錄</div>
+            </div>
+        </div>
+
+        <div style="margin-top:auto; padding-top:20px;">
+             <button id="resetBtn" style="background:none; border:1px dashed #475569; color:#64748b; padding:10px; width:100%; border-radius:8px; font-size:12px;">恢復原廠設定</button>
+        </div>
+    </div>
+
+    <div class="content">
+        <div id="alertOverlay" class="alert-overlay">
+            <div class="alert-title">手動調整阻力</div>
+            <div id="alertTargetLevel" class="alert-level">15</div>
+            <div class="alert-sub">請轉動旋鈕設定阻力</div>
+            <button class="alert-btn" onclick="dismissAlert()">知道了</button>
+        </div>
+
+        <div style="text-align:center;">
+            <div id="totalLabel" style="color:#94a3b8; font-size:16px; text-transform:uppercase; letter-spacing:2px; font-weight:bold;">總剩餘時間</div>
+            <div id="globalTimer" class="global-timer">00:00</div>
+            <div id="currentPhaseInfo" style="font-size:22px; font-weight:bold; color:var(--primary); margin-bottom:25px;">
+                準備就緒
+            </div>
+        </div>
+
+        <div class="phase-list">
+            <div id="card_warmup" class="phase-card">
+                <div class="phase-header"><span style="color:#a5b4fc">暖身</span><span id="timer_warmup">00:00</span></div>
+                <div class="controls-row">
+                    <div class="control-group">
+                        <button id="btn_warmup_res_minus" class="ctrl-btn">-</button>
+                        <span style="font-size:12px; color:#94a3b8; margin-right:5px;">阻力</span>
+                        <span id="val_res_warmup" style="font-weight:bold; font-size:20px; width:30px; text-align:center;">--</span>
+                        <button id="btn_warmup_res_plus" class="ctrl-btn">+</button>
+                    </div>
+                    <div class="control-group">
+                        <button id="btn_warmup_time_minus" class="ctrl-btn">-</button>
+                        <span style="font-size:12px; color:#94a3b8; margin-right:5px;">分鐘</span>
+                        <span id="val_time_warmup" style="font-weight:bold; font-size:20px; width:30px; text-align:center;">--</span>
+                        <button id="btn_warmup_time_plus" class="ctrl-btn">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="card_workout1" class="phase-card">
+                <div class="phase-header"><span style="color:#86efac">訓練 1</span><span id="timer_workout1">00:00</span></div>
+                <div class="controls-row">
+                    <div class="control-group">
+                        <button id="btn_workout1_res_minus" class="ctrl-btn">-</button>
+                        <span style="font-size:12px; color:#94a3b8; margin-right:5px;">阻力</span>
+                        <span id="val_res_workout1" style="font-weight:bold; font-size:20px; width:40px; text-align:center;">--</span>
+                        <button id="btn_workout1_res_plus" class="ctrl-btn">+</button>
+                    </div>
+                    <div class="control-group">
+                        <button id="btn_workout1_time_minus" class="ctrl-btn">-</button>
+                        <span style="font-size:12px; color:#94a3b8; margin-right:5px;">分鐘</span>
+                        <span id="val_time_workout1" style="font-weight:bold; font-size:20px; width:40px; text-align:center;">--</span>
+                        <button id="btn_workout1_time_plus" class="ctrl-btn">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="card_workout2" class="phase-card">
+                <div class="phase-header"><span style="color:#fcd34d">訓練 2</span><span id="timer_workout2">00:00</span></div>
+                <div class="controls-row">
+                    <div class="control-group">
+                        <button id="btn_workout2_res_minus" class="ctrl-btn">-</button>
+                        <span style="font-size:12px; color:#94a3b8; margin-right:5px;">阻力</span>
+                        <span id="val_res_workout2" style="font-weight:bold; font-size:20px; width:40px; text-align:center;">--</span>
+                        <button id="btn_workout2_res_plus" class="ctrl-btn">+</button>
+                    </div>
+                    <div class="control-group">
+                        <button id="btn_workout2_time_minus" class="ctrl-btn">-</button>
+                        <span style="font-size:12px; color:#94a3b8; margin-right:5px;">分鐘</span>
+                        <span id="val_time_workout2" style="font-weight:bold; font-size:20px; width:40px; text-align:center;">--</span>
+                        <button id="btn_workout2_time_plus" class="ctrl-btn">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="card_cooldown" class="phase-card">
+                <div class="phase-header"><span style="color:#93c5fd">緩和</span><span id="timer_cooldown">00:00</span></div>
+                <div class="controls-row">
+                    <div class="control-group">
+                        <button id="btn_cooldown_res_minus" class="ctrl-btn">-</button>
+                        <span style="font-size:12px; color:#94a3b8; margin-right:5px;">阻力</span>
+                        <span id="val_res_cooldown" style="font-weight:bold; font-size:20px; width:40px; text-align:center;">--</span>
+                        <button id="btn_cooldown_res_plus" class="ctrl-btn">+</button>
+                    </div>
+                    <div class="control-group">
+                        <button id="btn_cooldown_time_minus" class="ctrl-btn">-</button>
+                        <span style="font-size:12px; color:#94a3b8; margin-right:5px;">分鐘</span>
+                        <span id="val_time_cooldown" style="font-weight:bold; font-size:20px; width:40px; text-align:center;">--</span>
+                        <button id="btn_cooldown_time_plus" class="ctrl-btn">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 1. CONFIG & STATE ---
+    const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
+    const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
+    // [MOD] Removed CTRL_UUID since bike is read-only
+
+    let connectedDevice = null;
+    let currentStatus = 'IDLE'; 
+    let currentPhase = null; 
+    const phaseOrder = ['warmup', 'workout1', 'workout2', 'cooldown'];
+    const phaseNamesZH = { warmup: '暖身', workout1: '訓練 1', workout2: '訓練 2', cooldown: '緩和' };
+    
+    let wakeLock = null;
+    let audioCtx = null;
+    let alertTimeout = null;
+
+    let targetResistance = 1; 
+    let workoutInterval;
+    
+    // Stats & Actual Timer
+    let rpmSamples = [];
+    let actualWorkoutSecs = 0; 
+
+    const defaultPhases = {
+        warmup:   { mins: 3,  res: 15 },
+        workout1: { mins: 7,  res: 22 },
+        workout2: { mins: 8,  res: 25 },
+        cooldown: { mins: 3,  res: 10 }
+    };
+    let phases = JSON.parse(JSON.stringify(defaultPhases));
+    let ui = {};
+
+    // --- 2. STARTUP ---
+    window.onload = function() {
+        try { initApp(); } 
+        catch(e) { rawLog(`INIT ERROR: ${e.message}`, 'err'); }
+    };
+
+    function initApp() {
+        ui = {
+            btStatus: document.getElementById('btStatus'),
+            connectBtn: document.getElementById('connectBtn'),
+            controlPanel: document.getElementById('controlPanel'),
+            startBtn: document.getElementById('startBtn'),
+            globalTimer: document.getElementById('globalTimer'),
+            totalLabel: document.getElementById('totalLabel'),
+            currentPhaseInfo: document.getElementById('currentPhaseInfo'), // [NEW] Info line
+            res: document.getElementById('resVal'),
+            rpm: document.getElementById('rpmVal'),
+            historyList: document.getElementById('historyList'),
+            alertOverlay: document.getElementById('alertOverlay'),
+            alertTargetLevel: document.getElementById('alertTargetLevel')
+        };
+
+        safeBind('connectBtn', startScan);
+        safeBind('startBtn', toggleWorkout);
+        safeBind('stopBtn', stopWorkout);
+        safeBind('resetBtn', factoryReset);
+        safeBind('prevBtn', () => jumpPhase('prev'));
+        safeBind('nextBtn', () => jumpPhase('next'));
+
+        ['warmup', 'workout1', 'workout2', 'cooldown'].forEach(key => {
+            safeBind(`btn_${key}_res_minus`, () => adjRes(key, -1));
+            safeBind(`btn_${key}_res_plus`, () => adjRes(key, 1));
+            safeBind(`btn_${key}_time_minus`, () => adjTime(key, -1));
+            safeBind(`btn_${key}_time_plus`, () => adjTime(key, 1));
+        });
+
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        });
+
+        loadSettings();
+        refreshUI();
+        displayHistory(); 
+        
+        rawLog("System Ready V1.0 ZH Manual Res");
+    }
+
+    function safeBind(id, fn) {
+        const el = document.getElementById(id);
+        if(el) el.addEventListener('click', fn);
+    }
+
+    // --- 3. BLUETOOTH CORE (READ ONLY) ---
+    async function startScan() {
+        initAudio(); 
+
+        if(!navigator.bluetooth) return alert("您的瀏覽器不支援 Web Bluetooth。");
+        try {
+            ui.connectBtn.innerText = "搜尋中...";
+            const dev = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true, 
+                optionalServices: [FTMS_UUID]
+            });
+            
+            connectedDevice = dev;
+            rawLog(`Device: ${dev.name}`);
+            
+            dev.addEventListener('gattserverdisconnected', onDisconnect);
+            const server = await dev.gatt.connect();
+            const svc = await server.getPrimaryService(FTMS_UUID);
+            
+            // [MOD] Only get DATA characteristics. Skipping Control Point to prevent crashes on Read-Only bikes.
+            const dataChar = await svc.getCharacteristic(DATA_UUID);
+            await dataChar.startNotifications();
+            dataChar.addEventListener('characteristicvaluechanged', parseData);
+
+            ui.btStatus.innerText = "已連線";
+            ui.btStatus.style.color = "#10b981";
+            ui.btStatus.style.border = "1px solid #10b981";
+            
+            ui.connectBtn.style.display = 'none';
+            ui.controlPanel.style.display = 'block'; 
+            
+            requestWakeLock();
+            
+            setTimeout(() => {
+                if (currentStatus === 'IDLE') toggleWorkout();
+            }, 300);
+            
+        } catch(e) {
+            ui.connectBtn.innerText = "點擊連線";
+            rawLog(`Connect Fail: ${e.message}`, 'err');
+        }
+    }
+
+    async function requestWakeLock() {
+        try { if('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } 
+        catch(err) {}
+    }
+
+    async function releaseWakeLock() {
+        if(wakeLock !== null) { await wakeLock.release(); wakeLock = null; }
+    }
+
+    function onDisconnect() {
+        ui.btStatus.innerText = "未連線";
+        ui.btStatus.style.color = "#64748b";
+        ui.btStatus.style.border = "none";
+        ui.connectBtn.style.display = 'block';
+        ui.connectBtn.innerText = "重新連線";
+        ui.controlPanel.style.display = 'none';
+
+        if(currentStatus!=='IDLE') stopWorkout();
+        connectedDevice = null;
+        releaseWakeLock();
+    }
+
+    // --- AUDIO & ALERTS ---
+    function initAudio() {
+        if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    // [NEW] Multi-oscillator digital ringtone
+    function playRingtone() {
+        if(!audioCtx) return;
+        try {
+            let t = audioCtx.currentTime;
+            // Play 3 rapid chime sequences
+            for(let i=0; i<3; i++) {
+                playTone(523.25, t + i*1.0, 0.1);      // C5
+                playTone(659.25, t + i*1.0 + 0.15, 0.1); // E5
+                playTone(783.99, t + i*1.0 + 0.3, 0.4);  // G5
+            }
+        } catch(e) {}
+    }
+
+    function playTone(freq, time, dur) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, time);
+        gain.gain.linearRampToValueAtTime(1, time + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + dur);
+        osc.start(time);
+        osc.stop(time + dur);
+    }
+
+    // [NEW] Trigger manual visual alert
+    function triggerManualAlert(level) {
+        playRingtone();
+        ui.alertTargetLevel.innerText = level;
+        ui.alertOverlay.style.display = 'flex';
+        
+        // Auto dismiss after 8 seconds
+        if(alertTimeout) clearTimeout(alertTimeout);
+        alertTimeout = setTimeout(() => { dismissAlert(); }, 8000);
+    }
+
+    function dismissAlert() {
+        ui.alertOverlay.style.display = 'none';
+        if(alertTimeout) clearTimeout(alertTimeout);
+    }
+
+    // --- 4. WORKOUT LOGIC ---
+    function toggleWorkout() {
+        initAudio();
+        if(currentStatus==='IDLE') startWorkout();
+        else if(currentStatus==='RUNNING') pauseWorkout();
+        else resumeWorkout();
+    }
+
+    function startWorkout() {
+        saveSettings();
+        requestWakeLock();
+        
+        rpmSamples = [];
+        actualWorkoutSecs = 0; 
+        currentStatus = 'RUNNING';
+        updateBtns();
+        
+        if(!currentPhase) currentPhase = 'warmup';
+        activatePhase(currentPhase); 
+        
+        if(workoutInterval) clearInterval(workoutInterval);
+        workoutInterval = setInterval(timerLoop, 1000);
+    }
+
+    function pauseWorkout() {
+        currentStatus = 'PAUSED';
+        clearInterval(workoutInterval);
+        updateBtns();
+        releaseWakeLock();
+    }
+
+    function resumeWorkout() {
+        currentStatus = 'RUNNING';
+        updateBtns();
+        requestWakeLock();
+        workoutInterval = setInterval(timerLoop, 1000);
+    }
+
+    function stopWorkout() {
+        currentStatus = 'IDLE';
+        currentPhase = null;
+        dismissAlert();
+        clearInterval(workoutInterval);
+        updateBtns();
+        document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
+        resetTimers(); refreshUI();
+        targetResistance = 1; 
+        saveSettings();
+        releaseWakeLock();
+    }
+
+    function jumpPhase(dir) {
+        let idx = phaseOrder.indexOf(currentPhase||'warmup');
+        let newIdx = dir === 'next' ? idx + 1 : idx - 1;
+        
+        if(newIdx < 0 || newIdx >= phaseOrder.length) return;
+        
+        if (dir === 'next') phases[currentPhase].remainingSecs = 0;
+        else {
+            phases[currentPhase].remainingSecs = phases[currentPhase].mins * 60;
+            phases[phaseOrder[newIdx]].remainingSecs = phases[phaseOrder[newIdx]].mins * 60;
+        }
+        
+        activatePhase(phaseOrder[newIdx]);
+        refreshUI();
+    }
+
+    function activatePhase(k) {
+        const oldTarget = targetResistance;
+        currentPhase = k;
+        document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
+        
+        const c = document.getElementById(`card_${k}`);
+        if(c) {
+            c.classList.add('active');
+            if(window.innerWidth < 820) c.scrollIntoView({behavior: "smooth", block: "center"});
+        }
+        
+        targetResistance = phases[k].res;
+        
+        // [MOD] Alert rider to manually change resistance if it's different from the last one
+        if (currentStatus === 'RUNNING' && (oldTarget !== targetResistance || actualWorkoutSecs === 0)) {
+            triggerManualAlert(targetResistance);
+        }
+    }
+
+    function timerLoop() {
+        if(!currentPhase) return;
+        
+        const curRpm = parseInt(ui.rpm.innerText);
+        if(curRpm > 0) rpmSamples.push(curRpm);
+        actualWorkoutSecs++; 
+
+        if(phases[currentPhase].remainingSecs > 0) phases[currentPhase].remainingSecs--;
+        else {
+            let idx = phaseOrder.indexOf(currentPhase);
+            if(idx < phaseOrder.length - 1) {
+                activatePhase(phaseOrder[idx+1]);
+            }
+            else { 
+                playRingtone();
+                saveWorkoutToHistory(); 
+                if(connectedDevice && connectedDevice.gatt.connected) connectedDevice.gatt.disconnect();
+                else stopWorkout();
+                alert("運動完成！"); 
+            }
+        }
+        refreshUI();
+    }
+
+    // --- 5. DATA & UI ---
+    function saveWorkoutToHistory() {
+        const actualMins = Math.max(1, Math.round(actualWorkoutSecs / 60));
+        const avgRpm = rpmSamples.length > 0 ? Math.round(rpmSamples.reduce((a,b)=>a+b) / rpmSamples.length) : 0;
+        const now = new Date();
+        const endTime = now.getHours().toString().padStart(2,'0') + ":" + now.getMinutes().toString().padStart(2,'0');
+
+        const record = { date: now.toLocaleDateString(), end: endTime, duration: actualMins, avg: avgRpm };
+        let history = JSON.parse(localStorage.getItem('horizon_history') || '[]');
+        history.unshift(record);
+        localStorage.setItem('horizon_history', JSON.stringify(history.slice(0, 3)));
+        displayHistory();
+    }
+
+    function displayHistory() {
+        const history = JSON.parse(localStorage.getItem('horizon_history') || '[]');
+        if (history.length === 0) {
+            ui.historyList.innerHTML = '<div style="font-size:11px; color:var(--text-muted); font-style:italic;">尚無紀錄</div>';
+            return;
+        }
+        ui.historyList.innerHTML = history.map(h => `
+            <div class="history-item">
+                <div class="h-row-main"><span class="h-time">${h.duration} 分鐘</span><span class="h-rpm">${h.avg} <small style="font-size:9px">平均踏頻</small></span></div>
+                <div class="h-sub">${h.date} • 完成於 ${h.end}</div>
+            </div>
+        `).join('');
+    }
+
+    function adjTime(p, d) {
+        if(phases[p].mins+d < 1) return;
+        phases[p].mins += d;
+        if(currentStatus==='IDLE' || currentPhase!==p) phases[p].remainingSecs = phases[p].mins*60;
+        else {
+            phases[p].remainingSecs += (d*60);
+            if(phases[p].remainingSecs < 0) phases[p].remainingSecs = 0;
+        }
+        refreshUI();
+    }
+
+    function adjRes(p, d) {
+        phases[p].res += d;
+        if(phases[p].res<1) phases[p].res=1;
+        if(phases[p].res>32) phases[p].res=32;
+        if(currentPhase===p) targetResistance = phases[p].res;
+        refreshUI();
+    }
+
+    function parseData(e) {
+        const v = e.target.value;
+        const f = v.getUint16(0, true);
+        let off = 2;
+
+        if(!(f&1)) { document.getElementById('spdVal').innerText = (v.getUint16(off,true)*0.01).toFixed(1); off+=2; }
+        if(f&2) off+=2;
+        if(f&4) { document.getElementById('rpmVal').innerText = Math.floor(v.getUint16(off,true)*0.5); off+=2; }
+        if(f&8) off+=2; if(f&16) off+=3;
+        
+        // Bike handles real resistance reading, we update UI with it
+        if(f&32) {
+            if(ui.res) ui.res.innerText = v.getInt16(off, true);
+            off+=2;
+        }
+        if(f&64) document.getElementById('pwrVal').innerText = v.getInt16(off,true);
+    }
+
+    function refreshUI() {
+        let totalPlanMins = 0, totalRemainingSecs = 0;
+        for(let k in phases) {
+            document.getElementById(`val_res_${k}`).innerText = phases[k].res;
+            document.getElementById(`val_time_${k}`).innerText = phases[k].mins;
+            document.getElementById(`timer_${k}`).innerText = fmt(phases[k].remainingSecs);
+            totalPlanMins += phases[k].mins;
+            totalRemainingSecs += phases[k].remainingSecs;
+        }
+        if(ui.globalTimer) ui.globalTimer.innerText = fmt(totalRemainingSecs);
+        if(ui.totalLabel) ui.totalLabel.innerText = `剩餘時間 (計畫: ${totalPlanMins}分)`;
+
+        // [NEW] Update current phase info line
+        if(currentStatus !== 'IDLE' && currentPhase) {
+            ui.currentPhaseInfo.innerText = `${phaseNamesZH[currentPhase]} • 目標阻力 ${targetResistance}`;
+        } else {
+            ui.currentPhaseInfo.innerText = "準備就緒";
+        }
+    }
+    
+    function fmt(s) { return `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`; }
+
+    function updateBtns() {
+        if(currentStatus==='IDLE') { ui.startBtn.innerText="開始運動"; ui.startBtn.style.background="#10b981"; }
+        else if(currentStatus==='RUNNING') { ui.startBtn.innerText="暫停"; ui.startBtn.style.background="#f59e0b"; }
+        else { ui.startBtn.innerText="繼續"; ui.startBtn.style.background="#10b981"; }
+    }
+
+    function loadSettings() {
+        try {
+            const saved = localStorage.getItem('horizon_v33'); // Keep storage key to preserve old settings
+            if(saved) {
+                const p = JSON.parse(saved);
+                for(let k in phases) { if(p[k]) { phases[k].mins=p[k].mins; phases[k].res=p[k].res; }}
+            }
+        } catch(e) {}
+        resetTimers();
+    }
+    function saveSettings() {
+        try {
+            const toSave = {};
+            for(let k in phases) toSave[k] = { mins:phases[k].mins, res:phases[k].res };
+            localStorage.setItem('horizon_v33', JSON.stringify(toSave));
+        } catch(e) {}
+    }
+    function factoryReset() {
+        if(!confirm("確定要重置所有設定與歷史紀錄嗎？")) return;
+        localStorage.removeItem('horizon_v33');
+        localStorage.removeItem('horizon_history'); 
+        phases = JSON.parse(JSON.stringify(defaultPhases));
+        resetTimers(); refreshUI(); displayHistory();
+    }
+    function resetTimers() { for(let k in phases) phases[k].remainingSecs = phases[k].mins * 60; refreshUI(); }
+</script>
+</body>
+</html>
