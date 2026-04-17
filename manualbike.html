@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>飛輪健身 V1.0</title>
+    <title>飛輪健身 V1.3</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -96,9 +96,10 @@
         .jump-row { display: flex; gap: 10px; margin-bottom: 10px; }
         .btn-jump { flex: 1; background: #475569; color: white; border: none; padding: 14px; border-radius: 10px; font-size: 14px; font-weight: bold; }
 
-        .global-timer { font-size: 36px; font-weight: 800; margin: 5px 0 10px 0; font-variant-numeric: tabular-nums; letter-spacing: 2px; color: white; }
+        /* [MOD] 縮小剩餘時間 */
+        .global-timer { font-size: 18px; font-weight: 800; margin: 5px 0 10px 0; font-variant-numeric: tabular-nums; letter-spacing: 2px; color: white; }
         
-        /* [MOD] iPad Landscape Phase Grid */
+        /* iPad Landscape Phase Grid */
         .phase-list { width: 100%; max-width: 800px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         
         .phase-card { 
@@ -141,7 +142,7 @@
         .h-rpm { font-size: 13px; font-weight: 800; color: var(--c-rpm); }
         .h-sub { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 
-        /* [NEW] Alert Overlay */
+        /* Alert Overlay */
         .alert-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(220, 38, 38, 0.95); z-index: 100;
@@ -161,6 +162,25 @@
             background: white; border: none; border-radius: 40px; cursor: pointer; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
         }
         .alert-btn:active { transform: scale(0.95); }
+
+        /* [MOD] Grid Layout for Phase Info */
+        .info-grid {
+            display: inline-grid;
+            grid-template-columns: 260px 100px 120px; /* Label | Number | Icon */
+            gap: 12px 20px;
+            align-items: center;
+            text-align: right;
+            font-size: 42px; 
+            font-weight: 900;
+            margin-bottom: 10px;
+        }
+        /* [MOD] Flexbox alignment for perfect vertical matching */
+        .ig-label { display: flex; justify-content: flex-end; align-items: baseline; width: 100%; }
+        .ig-phase-name { margin-right: auto; color: var(--primary); }
+        .ig-sub { font-size: 22px; color: var(--text-muted); font-weight: 700; margin-left: 10px; }
+        .ig-sub-main { font-size: 22px; color: var(--text-muted); font-weight: 700; }
+        /* [MOD] 放大3倍圖示 */
+        .ig-icon { font-size: 72px; text-align: left; color: #ef4444; font-weight: 900; white-space: nowrap; line-height: 0.8; }
     </style>
 </head>
 <body>
@@ -168,7 +188,7 @@
 <div class="app-container">
     <div class="sidebar">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="font-weight:900; font-size:22px; letter-spacing:-0.5px; color:#fff;">飛輪健身 <span style="color:var(--primary); font-size:14px;">V1.0</span></div>
+            <div style="font-weight:900; font-size:22px; letter-spacing:-0.5px; color:#fff;">飛輪健身 <span style="color:var(--primary); font-size:14px;">V1.3</span></div>
             <div id="btStatus" style="font-size:12px; font-weight:bold; color:#64748b; background:#0f172a; padding:4px 8px; border-radius:6px;">未連線</div>
         </div>
 
@@ -180,6 +200,7 @@
         </div>
 
         <button id="connectBtn" class="main-btn btn-connect">點擊連線</button>
+        <button id="testUiBtn" style="background:none; border:1px solid #3b82f6; color:#3b82f6; padding:10px; width:100%; border-radius:8px; font-size:14px; font-weight:bold; margin-bottom:15px; cursor:pointer;">🔍 預覽 UI 介面 (測試用)</button>
         
         <div id="controlPanel" style="display:none;"> 
             <button id="startBtn" class="main-btn btn-start">開始運動</button>
@@ -213,8 +234,8 @@
         <div style="text-align:center;">
             <div id="totalLabel" style="color:#94a3b8; font-size:14px; text-transform:uppercase; letter-spacing:2px; font-weight:bold;">總剩餘時間</div>
             <div id="globalTimer" class="global-timer">00:00</div>
-            <div id="currentPhaseInfo" style="font-size:48px; font-weight:900; color:var(--primary); margin-bottom:25px; line-height:1.2;">
-                準備就緒
+            <div id="currentPhaseInfo" style="margin-bottom:25px; min-height:120px; display:flex; flex-direction:column; justify-content:center;">
+                <div style="font-size:42px; font-weight:900; color:var(--primary);">準備就緒</div>
             </div>
         </div>
 
@@ -298,7 +319,6 @@
     // --- 1. CONFIG & STATE ---
     const FTMS_UUID = "00001826-0000-1000-8000-00805f9b34fb";
     const DATA_UUID = "00002ad2-0000-1000-8000-00805f9b34fb";
-    // [MOD] Removed CTRL_UUID since bike is read-only
 
     let connectedDevice = null;
     let currentStatus = 'IDLE'; 
@@ -340,12 +360,13 @@
             startBtn: document.getElementById('startBtn'),
             globalTimer: document.getElementById('globalTimer'),
             totalLabel: document.getElementById('totalLabel'),
-            currentPhaseInfo: document.getElementById('currentPhaseInfo'), // [NEW] Info line
+            currentPhaseInfo: document.getElementById('currentPhaseInfo'),
             res: document.getElementById('resVal'),
             rpm: document.getElementById('rpmVal'),
             historyList: document.getElementById('historyList'),
             alertOverlay: document.getElementById('alertOverlay'),
-            alertTargetLevel: document.getElementById('alertTargetLevel')
+            alertTargetLevel: document.getElementById('alertTargetLevel'),
+            testUiBtn: document.getElementById('testUiBtn') 
         };
 
         safeBind('connectBtn', startScan);
@@ -354,6 +375,7 @@
         safeBind('resetBtn', factoryReset);
         safeBind('prevBtn', () => jumpPhase('prev'));
         safeBind('nextBtn', () => jumpPhase('next'));
+        safeBind('testUiBtn', testUI);
 
         ['warmup', 'workout1', 'workout2', 'cooldown'].forEach(key => {
             safeBind(`btn_${key}_res_minus`, () => adjRes(key, -1));
@@ -372,7 +394,7 @@
         refreshUI();
         displayHistory(); 
         
-        rawLog("System Ready V1.0 ZH Manual Res");
+        rawLog("System Ready V1.3 ZH Manual Res Grid Layout");
     }
 
     function safeBind(id, fn) {
@@ -399,7 +421,6 @@
             const server = await dev.gatt.connect();
             const svc = await server.getPrimaryService(FTMS_UUID);
             
-            // [MOD] Only get DATA characteristics. Skipping Control Point to prevent crashes on Read-Only bikes.
             const dataChar = await svc.getCharacteristic(DATA_UUID);
             await dataChar.startNotifications();
             dataChar.addEventListener('characteristicvaluechanged', parseData);
@@ -409,6 +430,7 @@
             ui.btStatus.style.border = "1px solid #10b981";
             
             ui.connectBtn.style.display = 'none';
+            ui.testUiBtn.style.display = 'none'; 
             ui.controlPanel.style.display = 'block'; 
             
             requestWakeLock();
@@ -437,6 +459,7 @@
         ui.btStatus.style.color = "#64748b";
         ui.btStatus.style.border = "none";
         ui.connectBtn.style.display = 'block';
+        ui.testUiBtn.style.display = 'block'; 
         ui.connectBtn.innerText = "重新連線";
         ui.controlPanel.style.display = 'none';
 
@@ -451,16 +474,14 @@
         if(audioCtx.state === 'suspended') audioCtx.resume();
     }
 
-    // [NEW] Multi-oscillator digital ringtone
     function playRingtone() {
         if(!audioCtx) return;
         try {
             let t = audioCtx.currentTime;
-            // Play 3 rapid chime sequences
             for(let i=0; i<3; i++) {
-                playTone(523.25, t + i*1.0, 0.1);      // C5
-                playTone(659.25, t + i*1.0 + 0.15, 0.1); // E5
-                playTone(783.99, t + i*1.0 + 0.3, 0.4);  // G5
+                playTone(523.25, t + i*1.0, 0.1);      
+                playTone(659.25, t + i*1.0 + 0.15, 0.1); 
+                playTone(783.99, t + i*1.0 + 0.3, 0.4);  
             }
         } catch(e) {}
     }
@@ -478,15 +499,14 @@
         osc.stop(time + dur);
     }
 
-    // [NEW] Trigger manual visual alert
     function triggerManualAlert(level) {
         playRingtone();
         ui.alertTargetLevel.innerText = level;
         ui.alertOverlay.style.display = 'flex';
         
-        // Auto dismiss after 8 seconds
         if(alertTimeout) clearTimeout(alertTimeout);
-        alertTimeout = setTimeout(() => { dismissAlert(); }, 8000);
+        // [MOD] Reduce time to 3.5 seconds
+        alertTimeout = setTimeout(() => { dismissAlert(); }, 3500); 
     }
 
     function dismissAlert() {
@@ -495,6 +515,31 @@
     }
 
     // --- 4. WORKOUT LOGIC ---
+    function testUI() {
+        if(currentStatus === 'IDLE') {
+            ui.controlPanel.style.display = 'block';
+            ui.res.innerText = "12"; 
+            
+            rpmSamples = [];
+            actualWorkoutSecs = 0; 
+            currentStatus = 'RUNNING';
+            
+            currentPhase = 'workout1';
+            targetResistance = phases['workout1'].res; 
+            
+            document.querySelectorAll('.phase-card').forEach(el=>el.classList.remove('active'));
+            document.getElementById(`card_workout1`).classList.add('active');
+            
+            updateBtns();
+            refreshUI();
+            triggerManualAlert(targetResistance); 
+        } else {
+            stopWorkout();
+            ui.controlPanel.style.display = 'none';
+            ui.res.innerText = "1";
+        }
+    }
+
     function toggleWorkout() {
         initAudio();
         if(currentStatus==='IDLE') startWorkout();
@@ -574,7 +619,6 @@
         
         targetResistance = phases[k].res;
         
-        // [MOD] Alert rider to manually change resistance if it's different from the last one
         if (currentStatus === 'RUNNING' && (oldTarget !== targetResistance || actualWorkoutSecs === 0)) {
             triggerManualAlert(targetResistance);
         }
@@ -661,13 +705,11 @@
         if(f&4) { document.getElementById('rpmVal').innerText = Math.floor(v.getUint16(off,true)*0.5); off+=2; }
         if(f&8) off+=2; if(f&16) off+=3;
         
-        // Bike handles real resistance reading, we update UI with it
         if(f&32) {
             if(ui.res) {
                 ui.res.innerText = v.getInt16(off, true);
-                // 確保使用者轉動旋鈕時，大標題列的「目前阻力」也能即時更新
-                if(currentStatus !== 'IDLE' && currentPhase && ui.currentPhaseInfo) {
-                    ui.currentPhaseInfo.innerText = `${phaseNamesZH[currentPhase]} • 目標阻力 ${targetResistance} (目前 ${ui.res.innerText})`;
+                if(currentStatus !== 'IDLE' && currentPhase) {
+                    refreshUI(); 
                 }
             }
             off+=2;
@@ -687,12 +729,41 @@
         if(ui.globalTimer) ui.globalTimer.innerText = fmt(totalRemainingSecs);
         if(ui.totalLabel) ui.totalLabel.innerText = `總剩餘時間 (計畫: ${totalPlanMins}分)`;
 
-        // [NEW] Update current phase info line with Current Resistance
+        // [MOD] Grid Layout for Phase Info with Warnings and Alignment
         if(currentStatus !== 'IDLE' && currentPhase) {
-            const currentRes = ui.res ? ui.res.innerText : "--";
-            ui.currentPhaseInfo.innerText = `${phaseNamesZH[currentPhase]} • 目標阻力 ${targetResistance} (目前 ${currentRes})`;
+            const currentResStr = ui.res ? ui.res.innerText : "--";
+            const cur = parseInt(currentResStr);
+            const tar = parseInt(targetResistance);
+            
+            let curColor = 'var(--text)'; 
+            let iconHtml = '';
+            
+            if (!isNaN(cur) && !isNaN(tar)) {
+                let diff = cur - tar;
+                if (Math.abs(diff) >= 2) {
+                    curColor = '#ef4444'; 
+                    iconHtml = diff > 0 ? '↺ 減' : '↻ 加';
+                }
+            }
+
+            ui.currentPhaseInfo.innerHTML = `
+                <div class="info-grid">
+                    <div class="ig-label">
+                        <span class="ig-phase-name">${phaseNamesZH[currentPhase]}</span>
+                        <span class="ig-sub">目前輕重</span>
+                    </div>
+                    <div style="color:${curColor};">${currentResStr}</div>
+                    <div class="ig-icon">${iconHtml}</div>
+
+                    <div class="ig-label">
+                        <span class="ig-sub-main">建議輕重</span>
+                    </div>
+                    <div style="color:white;">${targetResistance}</div>
+                    <div></div>
+                </div>
+            `;
         } else {
-            ui.currentPhaseInfo.innerText = "準備就緒";
+            ui.currentPhaseInfo.innerHTML = `<div style="font-size:42px; font-weight:900; color:var(--primary);">準備就緒</div>`;
         }
     }
     
@@ -706,7 +777,7 @@
 
     function loadSettings() {
         try {
-            const saved = localStorage.getItem('horizon_v33'); // Keep storage key to preserve old settings
+            const saved = localStorage.getItem('horizon_v33'); 
             if(saved) {
                 const p = JSON.parse(saved);
                 for(let k in phases) { if(p[k]) { phases[k].mins=p[k].mins; phases[k].res=p[k].res; }}
