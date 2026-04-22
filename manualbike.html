@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>飛輪健身 V1.3</title>
+    <title>飛輪健身 V1.4</title>
     
     <script>
         function rawLog(msg, type='info') {
@@ -96,8 +96,8 @@
         .jump-row { display: flex; gap: 10px; margin-bottom: 10px; }
         .btn-jump { flex: 1; background: #475569; color: white; border: none; padding: 14px; border-radius: 10px; font-size: 14px; font-weight: bold; }
 
-        /* [MOD] 縮小剩餘時間 */
-        .global-timer { font-size: 18px; font-weight: 800; margin: 5px 0 10px 0; font-variant-numeric: tabular-nums; letter-spacing: 2px; color: white; }
+        /* [MOD] 修改剩餘時間大小為 36px */
+        .global-timer { font-size: 36px; font-weight: 800; margin: 5px 0 10px 0; font-variant-numeric: tabular-nums; letter-spacing: 2px; color: white; }
         
         /* iPad Landscape Phase Grid */
         .phase-list { width: 100%; max-width: 800px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -163,7 +163,7 @@
         }
         .alert-btn:active { transform: scale(0.95); }
 
-        /* [MOD] Grid Layout for Phase Info */
+        /* Grid Layout for Phase Info */
         .info-grid {
             display: inline-grid;
             grid-template-columns: 260px 100px 120px; /* Label | Number | Icon */
@@ -174,12 +174,12 @@
             font-weight: 900;
             margin-bottom: 10px;
         }
-        /* [MOD] Flexbox alignment for perfect vertical matching */
+        /* Flexbox alignment for perfect vertical matching */
         .ig-label { display: flex; justify-content: flex-end; align-items: baseline; width: 100%; }
         .ig-phase-name { margin-right: auto; color: var(--primary); }
         .ig-sub { font-size: 22px; color: var(--text-muted); font-weight: 700; margin-left: 10px; }
         .ig-sub-main { font-size: 22px; color: var(--text-muted); font-weight: 700; }
-        /* [MOD] 放大3倍圖示 */
+        /* 放大3倍圖示 */
         .ig-icon { font-size: 72px; text-align: left; color: #ef4444; font-weight: 900; white-space: nowrap; line-height: 0.8; }
     </style>
 </head>
@@ -188,7 +188,7 @@
 <div class="app-container">
     <div class="sidebar">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <div style="font-weight:900; font-size:22px; letter-spacing:-0.5px; color:#fff;">飛輪健身 <span style="color:var(--primary); font-size:14px;">V1.3</span></div>
+            <div style="font-weight:900; font-size:22px; letter-spacing:-0.5px; color:#fff;">飛輪健身 <span style="color:var(--primary); font-size:14px;">V1.4</span></div>
             <div id="btStatus" style="font-size:12px; font-weight:bold; color:#64748b; background:#0f172a; padding:4px 8px; border-radius:6px;">未連線</div>
         </div>
 
@@ -200,7 +200,6 @@
         </div>
 
         <button id="connectBtn" class="main-btn btn-connect">點擊連線</button>
-        <button id="testUiBtn" style="background:none; border:1px solid #3b82f6; color:#3b82f6; padding:10px; width:100%; border-radius:8px; font-size:14px; font-weight:bold; margin-bottom:15px; cursor:pointer;">🔍 預覽 UI 介面 (測試用)</button>
         
         <div id="controlPanel" style="display:none;"> 
             <button id="startBtn" class="main-btn btn-start">開始運動</button>
@@ -219,6 +218,7 @@
         </div>
 
         <div style="margin-top:auto; padding-top:20px;">
+             <button id="testUiBtn" style="background:none; border:1px solid #3b82f6; color:#3b82f6; padding:10px; width:100%; border-radius:8px; font-size:14px; font-weight:bold; margin-bottom:10px; cursor:pointer;">🔍 預覽 UI 介面 (測試用)</button>
              <button id="resetBtn" style="background:none; border:1px dashed #475569; color:#64748b; padding:10px; width:100%; border-radius:8px; font-size:12px;">恢復原廠設定</button>
         </div>
     </div>
@@ -394,7 +394,7 @@
         refreshUI();
         displayHistory(); 
         
-        rawLog("System Ready V1.3 ZH Manual Res Grid Layout");
+        rawLog("System Ready V1.4 ZH Manual Res Grid Layout");
     }
 
     function safeBind(id, fn) {
@@ -505,8 +505,7 @@
         ui.alertOverlay.style.display = 'flex';
         
         if(alertTimeout) clearTimeout(alertTimeout);
-        // [MOD] Reduce time to 3.5 seconds
-        alertTimeout = setTimeout(() => { dismissAlert(); }, 3500); 
+        alertTimeout = setTimeout(() => { dismissAlert(); }, 4000); 
     }
 
     function dismissAlert() {
@@ -729,7 +728,6 @@
         if(ui.globalTimer) ui.globalTimer.innerText = fmt(totalRemainingSecs);
         if(ui.totalLabel) ui.totalLabel.innerText = `總剩餘時間 (計畫: ${totalPlanMins}分)`;
 
-        // [MOD] Grid Layout for Phase Info with Warnings and Alignment
         if(currentStatus !== 'IDLE' && currentPhase) {
             const currentResStr = ui.res ? ui.res.innerText : "--";
             const cur = parseInt(currentResStr);
